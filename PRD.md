@@ -12,6 +12,12 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
 - **Requirement**: UI component to select multiple Excel files from the user's file system
 - **File Types**: `.xlsx`, `.xls`
 - **User Experience**: Drag-and-drop support preferred, with traditional file picker as alternative
+- **Quantity Multiplier**: After files are selected, allow user to input a positive integer (multiplier) for each file
+  - Default value: 1
+  - **Must be a positive integer only** (no decimals allowed)
+  - Minimum value: 1
+  - This multiplier will be applied to the `QTY` value of every item in that specific file before consolidation
+  - Example: If a file has an item with QTY=5 and multiplier=3, the effective quantity for that item becomes 15
 
 #### 2. Data Processing
 
@@ -31,7 +37,11 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
 **Data Extraction:**
 - Once header row is identified, extract data **only from the columns specified in user configuration**
 - For each row beneath the header, capture values only from the matched columns
-- **Data Row Criteria**: Only process rows that have data in both the `QTY` and `MFR PART #` columns. Rows missing data in either of these columns are not considered part of the dataset and should be skipped (not treated as errors).
+- **Quantity Multiplier Application**: Multiply the `QTY` value by the file's multiplier (as specified by the user) before any consolidation
+- **Data Row Criteria**: Only process rows that meet all of the following conditions:
+  - Have data in both the `QTY` and `MFR PART #` columns
+  - The value in the `QTY` column is a valid number
+  - Rows that fail any of these criteria are not considered part of the dataset and should be skipped (not treated as errors)
 - Ignore all other columns present in the Excel file
 - Stop processing when encountering end of data
 - Associate each extracted data value with its corresponding configured column header
@@ -39,7 +49,7 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
 **Deduplication Logic:**
 - **Primary Key**: `MFR PART #`
 - **Consolidation Rule**: Items with identical `MFR PART #` values are duplicates
-- **Quantity Aggregation**: Sum the `QTY` values for all duplicate items
+- **Quantity Aggregation**: Sum the `QTY` values (after multiplier has been applied) for all duplicate items
 - **Other Columns**: Retain the first occurrence's data for `BPP SKU`, `MANUFACTURER`, and `DESCRIPTION`
 
 #### 3. User Configuration
@@ -56,6 +66,8 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
 #### 4. Output Generation
 - **Format**: Excel file (`.xlsx`)
 - **Structure**: Single sheet with consolidated data
+- **Title Row**: First row (row 1) should contain the text "BILL OF MATERIAL"
+- **Header Row**: Second row (row 2) contains column headers
 - **Columns** (in this order):
   1. QTY (aggregated values)
   2. BPP SKU
@@ -71,6 +83,19 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
   - Note: When consolidating duplicate items, use the formatting from the first occurrence (applies to all columns including QTY)
 - **Column Widths**: Preserve the original column widths from the source files (from the first file processed)
 - **Technical Note**: SheetJS (xlsx library) supports cell formatting preservation for this functionality
+- **Output Filename**: Format as "BOM: {filename1} (xN), {filename2} (xM)..." where:
+  - Filenames are the names of the input files (without extensions) separated by commas
+  - If a file has a multiplier greater than 1, append " (xN)" where N is the multiplier value
+  - If a file has a multiplier of 1, do not append any multiplier notation
+  - Examples:
+    - With multipliers of 1: "BOM: file1, file2, file3.xlsx"
+    - With multipliers: "BOM: file1 (x3), file2, file3 (x2).xlsx"
+  - **Filename Length Limit**: Maximum 250 characters
+  - **Truncation Logic**: If the full filename would exceed 250 characters:
+    - Include as many complete filenames (with their multipliers if applicable) as possible (separated by commas)
+    - Append " and X more" where X is the count of remaining files not shown
+    - Example: "BOM: file1 (x2), file2 and 3 more.xlsx"
+    - Ensure the final filename (including ".xlsx" extension) does not exceed 250 characters
 - **Download**: Trigger automatic download of the generated Excel file
 
 ---
@@ -89,6 +114,8 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
 1. **File Selection Area**
    - Multiple file upload capability
    - Visual feedback showing selected file names and count
+   - Input field for quantity multiplier next to each selected file (default: 1)
+   - Validation to ensure multipliers are positive integers only (no decimals)
    
 2. **Column Configuration Section**
    - Text inputs for each column name
@@ -121,13 +148,16 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
 3. **Invalid Data**: Handle non-numeric values in `QTY` column (treat as 0 or skip row)
 4. **Case Sensitivity**: Column header matching should be case-insensitive
 5. **Whitespace**: Trim whitespace from column headers and `MFR PART #` values
+6. **Long Filenames**: Truncate output filename if combined input filenames exceed 250 characters
+7. **Invalid Multipliers**: Reset to 1 if user enters non-integer or negative values
 
 ---
 
 ### Success Criteria
 - Successfully consolidates data from 2+ Excel files
 - Correctly identifies and sums duplicate items
-- Generates a valid, downloadable Excel file
+- Applies integer multipliers correctly to quantities
+- Generates a valid, downloadable Excel file with appropriate filename (max 250 chars)
 - Handles various header row positions
 - Provides clear feedback for errors
 - User can customize column names without code changes
