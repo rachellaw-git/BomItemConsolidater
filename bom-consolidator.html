@@ -279,7 +279,7 @@
         <p class="subtitle">Consolidate multiple BOM Excel files by identifying duplicates and summing quantities</p>
 
         <div class="upload-area" id="uploadArea">
-            <div class="upload-icon">📁</div>
+            <div class="upload-icon">📂</div>
             <h3>Drop Excel files here or click to browse</h3>
             <p style="color: #666; margin-top: 10px;">Supports .xlsx and .xls files</p>
             <input type="file" id="fileInput" accept=".xlsx,.xls" multiple>
@@ -451,6 +451,7 @@
                     <h3>✓ Success!</h3>
                     <p>Consolidated ${result.itemCount} items from ${files.length} file(s)</p>
                     <p>File downloaded as: ${result.filename}</p>
+                    ${result.warnings.length > 0 ? `<p style="color: #856404; margin-top: 10px;">⚠ ${result.warnings.length} warning(s) - see Consolidation Summary sheet</p>` : ''}
                 `;
                 resultsDiv.classList.add('show');
             } catch (err) {
@@ -465,20 +466,32 @@
 
         async function processFiles(fileItems, config) {
             const allData = [];
-            const skippedFiles = [];
+            const warnings = [];
+            const fileInfos = [];
 
             for (let item of fileItems) {
                 try {
                     const data = await readExcelFile(item.file, config, item.multiplier);
                     allData.push(...data);
+                    fileInfos.push({
+                        name: item.file.name,
+                        multiplier: item.multiplier,
+                        status: 'success'
+                    });
                 } catch (err) {
-                    skippedFiles.push({ name: item.file.name, error: err.message });
+                    warnings.push(`File '${item.file.name}' skipped - ${err.message}`);
+                    fileInfos.push({
+                        name: item.file.name,
+                        multiplier: item.multiplier,
+                        status: 'error',
+                        error: err.message
+                    });
                 }
             }
 
             if (allData.length === 0) {
                 throw new Error('No valid data found in any files. ' + 
-                    (skippedFiles.length > 0 ? `Errors: ${skippedFiles.map(f => f.error).join('; ')}` : ''));
+                    (warnings.length > 0 ? `Errors: ${warnings.join('; ')}` : ''));
             }
 
             // Consolidate duplicates
@@ -487,13 +500,11 @@
             // Sort
             sortData(consolidated);
 
-            // Generate filename
-            const filename = generateFilename(fileItems);
+            // Generate Excel with summary sheet
+            const filename = 'Consolidated BOM.xlsx';
+            generateExcel(consolidated, config, filename, fileInfos, warnings);
 
-            // Generate Excel
-            generateExcel(consolidated, config, filename);
-
-            return { itemCount: consolidated.length, filename };
+            return { itemCount: consolidated.length, filename, warnings };
         }
 
         function readExcelFile(file, config, multiplier) {
@@ -506,7 +517,7 @@
                         const workbook = XLSX.read(data, { type: 'array' });
                         
                         if (workbook.SheetNames.length === 0) {
-                            reject(new Error(`No sheets found in ${file.name}`));
+                            reject(new Error(`No sheets found`));
                             return;
                         }
 
@@ -514,7 +525,7 @@
                         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
                         if (rows.length === 0) {
-                            reject(new Error(`Empty file: ${file.name}`));
+                            reject(new Error(`Empty file`));
                             return;
                         }
 
@@ -540,7 +551,7 @@
                         }
 
                         if (headerRowIdx === -1) {
-                            reject(new Error(`Required columns not found in ${file.name}`));
+                            reject(new Error(`Required columns not found`));
                             return;
                         }
 
@@ -567,13 +578,18 @@
                             });
                         }
 
+                        if (extractedData.length === 0) {
+                            reject(new Error(`No valid data rows found`));
+                            return;
+                        }
+
                         resolve(extractedData);
                     } catch (err) {
-                        reject(new Error(`Error processing ${file.name}: ${err.message}`));
+                        reject(new Error(`Error processing file: ${err.message}`));
                     }
                 };
 
-                reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+                reader.onerror = () => reject(new Error(`Failed to read file`));
                 reader.readAsArrayBuffer(file);
             });
         }
@@ -612,47 +628,10 @@
             });
         }
 
-        function generateFilename(fileItems) {
-            const MAX_LENGTH = 250;
-            let parts = [];
-            
-            for (let item of fileItems) {
-                const baseName = item.file.name.replace(/\.(xlsx|xls)$/i, '');
-                const part = item.multiplier > 1 ? `${baseName} (x${item.multiplier})` : baseName;
-                parts.push(part);
-            }
-
-            let filename = 'BOM: ' + parts.join(', ') + '.xlsx';
-            
-            if (filename.length > MAX_LENGTH) {
-                parts = [];
-                let remaining = fileItems.length;
-                
-                for (let i = 0; i < fileItems.length; i++) {
-                    const baseName = fileItems[i].file.name.replace(/\.(xlsx|xls)$/i, '');
-                    const part = fileItems[i].multiplier > 1 ? `${baseName} (x${fileItems[i].multiplier})` : baseName;
-                    const testFilename = 'BOM: ' + parts.concat(part).join(', ') + ` and ${remaining - i - 1} more.xlsx`;
-                    
-                    if (testFilename.length > MAX_LENGTH) {
-                        filename = 'BOM: ' + parts.join(', ') + ` and ${remaining - i} more.xlsx`;
-                        break;
-                    }
-                    
-                    parts.push(part);
-                }
-                
-                if (parts.length === fileItems.length) {
-                    filename = 'BOM: ' + parts.join(', ') + '.xlsx';
-                }
-            }
-
-            return filename;
-        }
-
-        function generateExcel(data, config, filename) {
+        function generateExcel(data, config, filename, fileInfos, warnings) {
             const wb = XLSX.utils.book_new();
             
-            // Create data array
+            // Sheet 1: Bill of Material
             const wsData = [
                 ['BILL OF MATERIAL'],
                 [config.qty, config.sku, config.partNum, config.mfr, config.desc]
@@ -664,12 +643,12 @@
 
             const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-            // Auto-fit column widths (except Description which stays at default)
+            // Auto-fit column widths (except Description)
             const colWidths = [];
             for (let colIdx = 0; colIdx < 5; colIdx++) {
                 if (colIdx === 4) {
-                    // Description column - no auto-fit, use default
-                    colWidths.push({});
+                    // Description column - set to 255
+                    colWidths.push({ wch: 255 });
                 } else {
                     // Auto-fit for QTY, SKU, PART NUM, MFR
                     let maxWidth = 10;
@@ -688,7 +667,46 @@
             // Merge cells for title
             ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }];
 
-            XLSX.utils.book_append_sheet(wb, ws, 'Consolidated');
+            XLSX.utils.book_append_sheet(wb, ws, 'Bill of Material');
+
+            // Sheet 2: Consolidation Summary
+            const now = new Date();
+            const dateStr = now.toUTCString();
+            
+            const summaryData = [
+                ['CONSOLIDATION SUMMARY'],
+                [],
+                [`Generated: ${dateStr}`],
+                [],
+                ['File Name', 'Multiplier']
+            ];
+
+            // Add file information
+            for (let info of fileInfos) {
+                summaryData.push([info.name, info.multiplier]);
+            }
+
+            // Add warnings/errors if any
+            if (warnings.length > 0) {
+                summaryData.push([]);
+                summaryData.push(['Warnings and Errors']);
+                for (let warning of warnings) {
+                    summaryData.push([warning]);
+                }
+            }
+
+            const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+
+            // Auto-fit columns for summary sheet
+            const summaryColWidths = [
+                { wch: 50 }, // File Name
+                { wch: 12 }  // Multiplier
+            ];
+            wsSummary['!cols'] = summaryColWidths;
+
+            XLSX.utils.book_append_sheet(wb, wsSummary, 'Consolidation Summary');
+
+            // Download file
             XLSX.writeFile(wb, filename);
         }
     </script>

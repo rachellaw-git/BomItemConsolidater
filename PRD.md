@@ -70,15 +70,13 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
   - DESCRIPTION
 
 #### 4. Output Generation
-- **Format**: Excel file (`.xlsx`)
-- **Structure**: Single sheet with consolidated data
+
+**Output File Structure:**
+The generated Excel file will contain **two sheets**:
+
+**Sheet 1: Bill of Material (BOM Data)**
 - **Title Row**: First row (row 1) should contain the text "BILL OF MATERIAL"
-  - Font Size: 16
-  - Bold: True
-  - Horizontal Alignment: Center
 - **Header Row**: Second row (row 2) contains column headers
-  - Font Size: 11
-  - Bold: True
 - **Columns** (in this order):
   1. QTY (aggregated values)
   2. BPP SKU
@@ -86,25 +84,32 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
   4. MANUFACTURER
   5. DESCRIPTION
 - **Data Rows**: All rows below the header row
-  - Font Size: 11
-  - Bold: False
 - **Column Widths**:
   - QTY, BPP SKU, MFR PART #, and MANUFACTURER: Auto-fit to content
-  - DESCRIPTION: Do not auto-fit (use default or fixed width)
-- **Output Filename**: Format as "BOM: {filename1} (xN), {filename2} (xM)..." where:
-  - Filenames are the names of the input files (without extensions) separated by commas
-  - If a file has a multiplier greater than 1, append " (xN)" where N is the multiplier value
-  - If a file has a multiplier of 1, do not append any multiplier notation
-  - Examples:
-    - With multipliers of 1: "BOM: file1, file2, file3.xlsx"
-    - With multipliers: "BOM: file1 (x3), file2, file3 (x2).xlsx"
-  - **Filename Length Limit**: Maximum 250 characters
-  - **Truncation Logic**: If the full filename would exceed 250 characters:
-    - Include as many complete filenames (with their multipliers if applicable) as possible (separated by commas)
-    - Append " and X more" where X is the count of remaining files not shown
-    - Example: "BOM: file1 (x2), file2 and 3 more.xlsx"
-    - Ensure the final filename (including ".xlsx" extension) does not exceed 250 characters
-- **Download**: Trigger automatic download of the generated Excel file
+  - DESCRIPTION: Set to 255 characters
+
+**Sheet 2: Consolidation Summary**
+- **Title Row**: First row (row 1) should contain the text "CONSOLIDATION SUMMARY"
+- **Metadata Section** (starting at row 3):
+  - Row 3: "Generated: [date/time]"
+    - Date/time format: Human-readable UTC format (e.g., "Thu, 23 Oct 2025 19:30:45 GMT")
+- **Source Files Table** (starting at row 5):
+  - Row 5: Headers - "File Name" | "Multiplier"
+  - Row 6+: Data rows listing each processed file and its multiplier
+- **Warnings/Errors Section** (if applicable):
+  - Display after the source files table (with one blank row separator)
+  - Header: "Warnings and Errors"
+  - List any warnings or errors encountered during processing
+    - Examples: "File 'example.xlsx' skipped - missing required columns", "File 'data.xlsx' - no valid data rows found"
+- **Column Widths**:
+  - File Name: Auto-fit to content
+  - Multiplier: Auto-fit to content
+
+**Output Filename:**
+- Fixed filename: "Consolidated BOM.xlsx"
+
+**Download:**
+- Trigger automatic download of the generated Excel file
 
 ---
 
@@ -141,18 +146,19 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
      - Missing required columns
      - Empty files
      - Processing failures
+   - All warnings and errors are logged to the Consolidation Summary sheet in the output file
 
 ---
 
 ### Edge Cases to Handle
 
-1. **Missing Columns**: If a required column is not found in a file, display error and skip that file
-2. **Empty Files**: Skip files with no data rows
+1. **Missing Columns**: If a required column is not found in a file, log warning to summary sheet and skip that file
+2. **Empty Files**: Skip files with no data rows and log warning to summary sheet
 3. **Invalid Data**: Handle non-numeric values in `QTY` column (treat as 0 or skip row)
 4. **Case Sensitivity**: Column header matching should be case-insensitive
 5. **Whitespace**: Trim whitespace from column headers and `MFR PART #` values
-6. **Long Filenames**: Truncate output filename if combined input filenames exceed 250 characters
-7. **Invalid Multipliers**: Reset to 1 if user enters non-integer or negative values
+6. **Invalid Multipliers**: Reset to 1 if user enters non-integer or negative values
+7. **No Valid Files**: If all files are skipped due to errors, display error message and do not generate output file
 
 ---
 
@@ -161,7 +167,9 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
 - Correctly identifies and sums duplicate items
 - Applies integer multipliers correctly to quantities
 - Sorts consolidated data by MANUFACTURER, then by MFR PART #
-- Generates a valid, downloadable Excel file with appropriate filename (max 250 chars)
+- Generates a valid, downloadable Excel file named "Consolidated BOM.xlsx"
+- Output file contains two sheets: BOM data (sheet 1) and Consolidation Summary (sheet 2)
+- Consolidation Summary includes all source files, multipliers, and any warnings/errors
 - Handles various header row positions
 - Provides clear feedback for errors
 - User can customize column names without code changes
