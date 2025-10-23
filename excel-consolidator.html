@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Consolidation Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: #667eea;
+            border-radius: 2px;
+        }
+
+        .upload-area {
+            border: 3px dashed #cbd5e0;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: #f7fafc;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #edf2f7;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #e6f2ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            font-size: 16px;
+            color: #4a5568;
+            margin-bottom: 8px;
+        }
+
+        .upload-hint {
+            font-size: 14px;
+            color: #718096;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-list {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            padding: 8px 12px;
+            background: white;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 14px;
+            color: #2d3748;
+            gap: 10px;
+        }
+
+        .file-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-count {
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .multiplier-input {
+            width: 80px;
+            padding: 6px 8px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .multiplier-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .multiplier-label {
+            font-size: 12px;
+            color: #718096;
+            margin-right: 4px;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .config-item label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .config-item input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .config-item input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .reset-btn {
+            margin-top: 15px;
+            padding: 8px 16px;
+            background: #718096;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .reset-btn:hover {
+            background: #4a5568;
+        }
+
+        .process-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .process-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .process-btn:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .process-btn.loading {
+            background: #cbd5e0;
+            cursor: wait;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .result {
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result.success {
+            background: #f0fdf4;
+            border: 2px solid #86efac;
+        }
+
+        .result.error {
+            background: #fef2f2;
+            border: 2px solid #fca5a5;
+        }
+
+        .result-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .result.success .result-title {
+            color: #166534;
+        }
+
+        .result.error .result-title {
+            color: #991b1b;
+        }
+
+        .result-message {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .result.success .result-message {
+            color: #15803d;
+        }
+
+        .result.error .result-message {
+            color: #b91c1c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Excel Consolidation Tool</h1>
+            <p>Merge multiple Excel files by consolidating duplicate items and summing quantities</p>
+        </div>
+
+        <div class="content">
+            <!-- File Upload Section -->
+            <div class="section">
+                <div class="section-title">1. Select Excel Files</div>
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">Drop Excel files here or click to browse</div>
+                    <div class="upload-hint">Supports .xlsx and .xls files</div>
+                    <input type="file" id="fileInput" class="file-input" multiple accept=".xlsx,.xls">
+                </div>
+                <div id="fileList" class="file-list" style="display: none;"></div>
+            </div>
+
+            <!-- Column Configuration Section -->
+            <div class="section">
+                <div class="section-title">2. Configure Column Names</div>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label>Quantity Column</label>
+                        <input type="text" id="colQty" value="QTY">
+                    </div>
+                    <div class="config-item">
+                        <label>SKU Column</label>
+                        <input type="text" id="colSku" value="BPP SKU">
+                    </div>
+                    <div class="config-item">
+                        <label>Part Number Column</label>
+                        <input type="text" id="colPartNum" value="MFR PART #">
+                    </div>
+                    <div class="config-item">
+                        <label>Manufacturer Column</label>
+                        <input type="text" id="colMfr" value="MANUFACTURER">
+                    </div>
+                    <div class="config-item">
+                        <label>Description Column</label>
+                        <input type="text" id="colDesc" value="DESCRIPTION">
+                    </div>
+                </div>
+                <button class="reset-btn" onclick="resetColumns()">Reset to Defaults</button>
+            </div>
+
+            <!-- Process Button -->
+            <div class="section">
+                <button class="process-btn" id="processBtn" disabled onclick="processFiles()">
+                    Consolidate Files
+                </button>
+            </div>
+
+            <!-- Results -->
+            <div id="result"></div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFiles = [];
+        let fileMultipliers = new Map();
+        const defaults = {
+            qty: 'QTY',
+            sku: 'BPP SKU',
+            partNum: 'MFR PART #',
+            mfr: 'MANUFACTURER',
+            desc: 'DESCRIPTION'
+        };
+
+        // Upload area handlers
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            selectedFiles = Array.from(files).filter(file => 
+                file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
+            );
+
+            if (selectedFiles.length === 0) {
+                showResult('error', 'No valid Excel files selected', 'Please select .xlsx or .xls files.');
+                return;
+            }
+
+            // Initialize multipliers for new files
+            selectedFiles.forEach(file => {
+                if (!fileMultipliers.has(file.name)) {
+                    fileMultipliers.set(file.name, 1);
+                }
+            });
+
+            displayFileList();
+            document.getElementById('processBtn').disabled = false;
+            clearResult();
+        }
+
+        function displayFileList() {
+            const fileList = document.getElementById('fileList');
+            fileList.style.display = 'block';
+            fileList.innerHTML = `
+                <div class="file-item">
+                    <span class="file-name">${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected</span>
+                    <span class="file-count">${selectedFiles.length}</span>
+                </div>
+                ${selectedFiles.map((f, idx) => `
+                    <div class="file-item">
+                        <span class="file-name">📄 ${f.name}</span>
+                        <div style="display: flex; align-items: center;">
+                            <span class="multiplier-label">Multiplier:</span>
+                            <input type="number" 
+                                   class="multiplier-input" 
+                                   id="multiplier-${idx}"
+                                   value="${fileMultipliers.get(f.name)}"
+                                   min="1"
+                                   step="1"
+                                   onchange="updateMultiplier('${f.name.replace(/'/g, "\\'")}', this.value)">
+                        </div>
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        function updateMultiplier(fileName, value) {
+            const multiplier = parseInt(value);
+            if (multiplier > 0 && Number.isInteger(multiplier)) {
+                fileMultipliers.set(fileName, multiplier);
+            } else {
+                fileMultipliers.set(fileName, 1);
+                selectedFiles.forEach((f, idx) => {
+                    if (f.name === fileName) {
+                        document.getElementById(`multiplier-${idx}`).value = 1;
+                    }
+                });
+            }
+        }
+
+        function resetColumns() {
+            document.getElementById('colQty').value = defaults.qty;
+            document.getElementById('colSku').value = defaults.sku;
+            document.getElementById('colPartNum').value = defaults.partNum;
+            document.getElementById('colMfr').value = defaults.mfr;
+            document.getElementById('colDesc').value = defaults.desc;
+        }
+
+        function getColumnConfig() {
+            return {
+                qty: document.getElementById('colQty').value.trim(),
+                sku: document.getElementById('colSku').value.trim(),
+                partNum: document.getElementById('colPartNum').value.trim(),
+                mfr: document.getElementById('colMfr').value.trim(),
+                desc: document.getElementById('colDesc').value.trim()
+            };
+        }
+
+        async function processFiles() {
+            const btn = document.getElementById('processBtn');
+            btn.classList.add('loading');
+            btn.innerHTML = '<span class="spinner"></span>Processing...';
+            btn.disabled = true;
+            clearResult();
+
+            try {
+                const config = getColumnConfig();
+                const consolidatedData = await consolidateExcelFiles(selectedFiles, config);
+                
+                if (consolidatedData.items.length === 0) {
+                    showResult('error', 'No Data Found', 'No valid data rows were found in the selected files.');
+                    return;
+                }
+
+                // Generate output filename with multipliers
+                const fileNamesWithMultipliers = selectedFiles.map(f => {
+                    const fileName = f.name.replace(/\.(xlsx|xls)$/i, '');
+                    const multiplier = fileMultipliers.get(f.name) || 1;
+                    return multiplier > 1 ? `${fileName} (x${multiplier})` : fileName;
+                }).join(', ');
+                
+                let outputFileName = `BOM: ${fileNamesWithMultipliers}.xlsx`;
+                
+                // Truncate filename if over 250 characters
+                if (outputFileName.length > 250) {
+                    const maxLength = 250 - 4; // Reserve space for ".xlsx"
+                    const prefix = 'BOM: ';
+                    const availableSpace = maxLength - prefix.length - 12; // Reserve space for "... and X more.xlsx"
+                    
+                    // Add as many filenames as possible
+                    let truncatedNames = '';
+                    let filesIncluded = 0;
+                    
+                    for (const file of selectedFiles) {
+                        const fileName = file.name.replace(/\.(xlsx|xls)$/i, '');
+                        const multiplier = fileMultipliers.get(file.name) || 1;
+                        const fileNameWithMultiplier = multiplier > 1 ? `${fileName} (x${multiplier})` : fileName;
+                        const separator = filesIncluded > 0 ? ', ' : '';
+                        const testName = truncatedNames + separator + fileNameWithMultiplier;
+                        
+                        if ((prefix + testName).length <= availableSpace) {
+                            truncatedNames = testName;
+                            filesIncluded++;
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    const remaining = selectedFiles.length - filesIncluded;
+                    if (remaining > 0) {
+                        outputFileName = `${prefix}${truncatedNames} and ${remaining} more.xlsx`;
+                    } else {
+                        outputFileName = `${prefix}${truncatedNames}.xlsx`;
+                    }
+                }
+
+                const outputFile = await createOutputExcel(consolidatedData, config);
+                downloadFile(outputFile, outputFileName);
+                
+                const totalQty = consolidatedData.items.reduce((sum, item) => sum + item.qty, 0);
+                showResult('success', 'Consolidation Complete!', 
+                    `Successfully consolidated ${consolidatedData.items.length} unique items from ${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''}.<br>
+                    Total quantity: ${Math.round(totalQty)}<br>
+                    File has been downloaded.`
+                );
+
+            } catch (error) {
+                showResult('error', 'Processing Error', error.message);
+            } finally {
+                btn.classList.remove('loading');
+                btn.innerHTML = 'Consolidate Files';
+                btn.disabled = false;
+            }
+        }
+
+        async function consolidateExcelFiles(files, config) {
+            const dataMap = new Map();
+            const errors = [];
+            let firstHeaderFormat = null;
+            let firstColWidths = null;
+
+            for (const file of files) {
+                try {
+                    const multiplier = fileMultipliers.get(file.name) || 1;
+                    const data = await readExcelFile(file);
+                    const workbook = XLSX.read(data, { type: 'array', cellStyles: true });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    
+                    const { headerRow, colIndices } = findHeaderRow(firstSheet, config);
+                    
+                    if (!headerRow) {
+                        errors.push(`${file.name}: Required columns not found`);
+                        continue;
+                    }
+
+                    if (!firstHeaderFormat) {
+                        firstHeaderFormat = captureHeaderFormat(firstSheet, headerRow, colIndices);
+                        firstColWidths = workbook.Sheets[workbook.SheetNames[0]]['!cols'];
+                    }
+
+                    const rows = extractDataRows(firstSheet, headerRow, colIndices, file.name, multiplier);
+                    
+                    rows.forEach(row => {
+                        const partNum = (row.partNum || '').toString().trim();
+                        if (!partNum) return;
+
+                        if (dataMap.has(partNum)) {
+                            const existing = dataMap.get(partNum);
+                            existing.qty += row.qty;
+                        } else {
+                            dataMap.set(partNum, { ...row });
+                        }
+                    });
+
+                } catch (error) {
+                    errors.push(`${file.name}: ${error.message}`);
+                }
+            }
+
+            if (errors.length > 0) {
+                console.warn('Errors during processing:', errors);
+            }
+
+            return {
+                items: Array.from(dataMap.values()),
+                headerFormat: firstHeaderFormat,
+                colWidths: firstColWidths
+            };
+        }
+
+        function readExcelFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = () => reject(new Error('Failed to read file'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function findHeaderRow(sheet, config) {
+            const range = XLSX.utils.decode_range(sheet['!ref']);
+            const searchColumns = [config.qty, config.sku, config.partNum, config.mfr, config.desc];
+            
+            for (let row = range.s.r; row <= range.e.r; row++) {
+                const colIndices = {};
+                let foundCount = 0;
+
+                for (let col = range.s.c; col <= range.e.c; col++) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+                    const cell = sheet[cellAddress];
+                    
+                    if (cell && cell.v) {
+                        const headerValue = cell.v.toString().trim().toUpperCase();
+                        
+                        searchColumns.forEach((searchCol, idx) => {
+                            const searchUpper = searchCol.toUpperCase();
+                            if (headerValue === searchUpper && !colIndices[['qty', 'sku', 'partNum', 'mfr', 'desc'][idx]]) {
+                                colIndices[['qty', 'sku', 'partNum', 'mfr', 'desc'][idx]] = col;
+                                foundCount++;
+                            }
+                        });
+                    }
+                }
+
+                if (colIndices.qty !== undefined && colIndices.partNum !== undefined && foundCount >= 2) {
+                    return { headerRow: row, colIndices };
+                }
+            }
+
+            return { headerRow: null, colIndices: {} };
+        }
+
+        function captureHeaderFormat(sheet, headerRow, colIndices) {
+            const formats = {};
+            Object.entries(colIndices).forEach(([key, col]) => {
+                const cellAddress = XLSX.utils.encode_cell({ r: headerRow, c: col });
+                const cell = sheet[cellAddress];
+                if (cell) {
+                    formats[key] = {
+                        s: cell.s ? { ...cell.s } : {},
+                        v: cell.v
+                    };
+                }
+            });
+            return formats;
+        }
+
+        function extractDataRows(sheet, headerRow, colIndices, fileName, multiplier) {
+            const range = XLSX.utils.decode_range(sheet['!ref']);
+            const rows = [];
+
+            for (let row = headerRow + 1; row <= range.e.r; row++) {
+                const qtyCell = sheet[XLSX.utils.encode_cell({ r: row, c: colIndices.qty })];
+                const partNumCell = sheet[XLSX.utils.encode_cell({ r: row, c: colIndices.partNum })];
+
+                if (
+                    !qtyCell || !qtyCell.v ||
+                    isNaN(parseFloat(qtyCell.v)) ||
+                    !partNumCell || !partNumCell.v
+                ) {
+                    continue;
+                }
+
+                const rowData = {
+                    qty: 0,
+                    sku: '',
+                    partNum: '',
+                    mfr: '',
+                    desc: '',
+                    formats: {}
+                };
+
+                Object.entries(colIndices).forEach(([key, col]) => {
+                    const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+                    const cell = sheet[cellAddress];
+                    
+                    if (cell) {
+                        if (key === 'qty') {
+                            const value = parseFloat(cell.v);
+                            rowData.qty = isNaN(value) ? 0 : value * multiplier;
+                        } else {
+                            rowData[key] = cell.v ? cell.v.toString() : '';
+                        }
+                        
+                        if (cell.s) {
+                            rowData.formats[key] = { ...cell.s };
+                        }
+                    }
+                });
+
+                rows.push(rowData);
+            }
+
+            return rows;
+        }
+
+        async function createOutputExcel(consolidatedData, config) {
+            const ws_data = [];
+            
+            ws_data.push(['BILL OF MATERIAL']);
+            
+            const headerRow = [
+                config.qty,
+                config.sku,
+                config.partNum,
+                config.mfr,
+                config.desc
+            ];
+            ws_data.push(headerRow);
+
+            consolidatedData.items.forEach(item => {
+                ws_data.push([
+                    item.qty,
+                    item.sku,
+                    item.partNum,
+                    item.mfr,
+                    item.desc
+                ]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+
+            if (consolidatedData.headerFormat) {
+                ['qty', 'sku', 'partNum', 'mfr', 'desc'].forEach((key, idx) => {
+                    const cellAddress = XLSX.utils.encode_cell({ r: 1, c: idx });
+                    if (ws[cellAddress] && consolidatedData.headerFormat[key]) {
+                        ws[cellAddress].s = consolidatedData.headerFormat[key].s;
+                    }
+                });
+            }
+
+            consolidatedData.items.forEach((item, rowIdx) => {
+                ['qty', 'sku', 'partNum', 'mfr', 'desc'].forEach((key, colIdx) => {
+                    const cellAddress = XLSX.utils.encode_cell({ r: rowIdx + 2, c: colIdx });
+                    if (ws[cellAddress] && item.formats[key]) {
+                        ws[cellAddress].s = item.formats[key];
+                    }
+                });
+            });
+
+            if (consolidatedData.colWidths) {
+                ws['!cols'] = consolidatedData.colWidths;
+            }
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Consolidated');
+
+            return XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
+        }
+
+        function downloadFile(data, filename) {
+            const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function showResult(type, title, message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = `
+                <div class="result-title">${type === 'success' ? '✅' : '❌'} ${title}</div>
+                <div class="result-message">${message}</div>
+            `;
+        }
+
+        function clearResult() {
+            document.getElementById('result').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
