@@ -52,6 +52,12 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
 - **Quantity Aggregation**: Sum the `QTY` values (after multiplier has been applied) for all duplicate items
 - **Other Columns**: Retain the first occurrence's data for `BPP SKU`, `MANUFACTURER`, and `DESCRIPTION`
 
+**Sorting:**
+- After consolidation and deduplication is complete, sort the consolidated data:
+  - **Primary Sort**: `MANUFACTURER` (alphabetical, A-Z)
+  - **Secondary Sort**: `MFR PART #` (alphabetical, A-Z)
+- Sorting should be case-insensitive
+
 #### 3. User Configuration
 - **Editable Column Names**: Provide UI controls to modify the expected column header names
 - **Purpose**: Allow users to adapt the tool to Excel files with slightly different naming conventions
@@ -67,22 +73,24 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
 - **Format**: Excel file (`.xlsx`)
 - **Structure**: Single sheet with consolidated data
 - **Title Row**: First row (row 1) should contain the text "BILL OF MATERIAL"
+  - Font Size: 16
+  - Bold: True
+  - Horizontal Alignment: Center
 - **Header Row**: Second row (row 2) contains column headers
+  - Font Size: 11
+  - Bold: True
 - **Columns** (in this order):
   1. QTY (aggregated values)
   2. BPP SKU
   3. MFR PART #
   4. MANUFACTURER
   5. DESCRIPTION
-- **Header Row Formatting**: Preserve the formatting from the source header row (from the first file processed), including font size, bold, alignment, etc.
-- **Data Cell Formatting**: The output cells should preserve the text formatting from the source Excel files, including:
-  - Font size
-  - Bold/italic/underline styling
-  - Text alignment (left/center/right)
-  - Any other text formatting present in the original data
-  - Note: When consolidating duplicate items, use the formatting from the first occurrence (applies to all columns including QTY)
-- **Column Widths**: Preserve the original column widths from the source files (from the first file processed)
-- **Technical Note**: SheetJS (xlsx library) supports cell formatting preservation for this functionality
+- **Data Rows**: All rows below the header row
+  - Font Size: 11
+  - Bold: False
+- **Column Widths**:
+  - QTY, BPP SKU, MFR PART #, and MANUFACTURER: Auto-fit to content
+  - DESCRIPTION: Do not auto-fit (use default or fixed width)
 - **Output Filename**: Format as "BOM: {filename1} (xN), {filename2} (xM)..." where:
   - Filenames are the names of the input files (without extensions) separated by commas
   - If a file has a multiplier greater than 1, append " (xN)" where N is the multiplier value
@@ -100,14 +108,6 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
 
 ---
 
-### Technical Requirements
-
-#### Libraries
-- **Excel Processing**: SheetJS (xlsx library) for reading and writing Excel files
-- **Browser Compatibility**: Modern browsers (Chrome, Firefox, Safari, Edge)
-
----
-
 ### User Interface Requirements
 
 #### Essential UI Elements
@@ -118,9 +118,12 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
    - Validation to ensure multipliers are positive integers only (no decimals)
    
 2. **Column Configuration Section**
-   - Text inputs for each column name
-   - Clear labels indicating purpose
-   - Reset to defaults button
+   - Collapsible "Advanced Settings" section (collapsed by default)
+   - When expanded, displays:
+     - Text inputs for each column name
+     - Clear labels indicating purpose
+     - Reset to defaults button
+   - Most users will not need to access this section
 
 3. **Process Button**
    - Clearly labeled (e.g., "Consolidate Files")
@@ -157,6 +160,7 @@ A browser-based HTML/JavaScript application that consolidates data from multiple
 - Successfully consolidates data from 2+ Excel files
 - Correctly identifies and sums duplicate items
 - Applies integer multipliers correctly to quantities
+- Sorts consolidated data by MANUFACTURER, then by MFR PART #
 - Generates a valid, downloadable Excel file with appropriate filename (max 250 chars)
 - Handles various header row positions
 - Provides clear feedback for errors

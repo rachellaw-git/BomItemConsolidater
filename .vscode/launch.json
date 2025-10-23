@@ -5,7 +5,7 @@
             "type": "chrome",
             "request": "launch",
             "name": "Launch Chrome against localhost",
-            "url": "http://127.0.0.1:5500/excel-consolidator.html",
+            "url": "http://127.0.0.1:5500/bom-consolidator.html",
             "webRoot": "${workspaceFolder}",
             "sourceMaps": true
         }
