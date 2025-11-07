@@ -1,384 +1,794 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BOM Consolidation Tool</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Consolidate multiple BOM Excel files or compare two BOM versions"
+    />
+    <title>BOM Tool - Consolidate & Compare</title>
+
+    <!-- SheetJS Library for Excel Processing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <!-- jsPDF and jsPDF-AutoTable for PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Oxygen, Ubuntu, Cantarell, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
 
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-        }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        padding: 40px;
+      }
 
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
+      h1 {
+        color: #333;
+        margin-bottom: 10px;
+        font-size: 28px;
+      }
 
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
+      .subtitle {
+        color: #666;
+        margin-bottom: 30px;
+        font-size: 14px;
+      }
 
-        .upload-area {
-            border: 2px dashed #667eea;
-            border-radius: 8px;
-            padding: 40px;
-            text-align: center;
-            background: #f8f9ff;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-bottom: 20px;
-        }
+      /* Tool Toggle */
+      .tool-toggle {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 30px;
+        border-bottom: 2px solid #e0e0e0;
+        padding-bottom: 0;
+      }
 
-        .upload-area:hover {
-            border-color: #764ba2;
-            background: #f0f2ff;
-        }
+      .tool-tab {
+        padding: 12px 24px;
+        background: none;
+        border: none;
+        border-bottom: 3px solid transparent;
+        color: #666;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
 
-        .upload-area.dragover {
-            border-color: #764ba2;
-            background: #e8ebff;
-        }
+      .tool-tab:hover {
+        color: #667eea;
+      }
 
-        .upload-icon {
-            font-size: 48px;
-            margin-bottom: 15px;
-        }
+      .tool-tab.active {
+        color: #667eea;
+        border-bottom-color: #667eea;
+      }
 
-        .file-list {
-            margin: 20px 0;
-        }
+      .tool-content {
+        display: none;
+      }
 
-        .file-item {
-            display: flex;
-            align-items: center;
-            padding: 12px;
-            background: #f8f9fa;
-            border-radius: 6px;
-            margin-bottom: 8px;
-        }
+      .tool-content.active {
+        display: block;
+      }
 
-        .file-name {
-            flex: 1;
-            color: #333;
-            font-size: 14px;
-        }
+      /* Upload Areas */
+      .upload-area {
+        border: 2px dashed #667eea;
+        border-radius: 8px;
+        padding: 40px;
+        text-align: center;
+        background: #f8f9ff;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-bottom: 20px;
+      }
 
-        .multiplier-input {
-            width: 80px;
-            padding: 6px 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin: 0 10px;
-            text-align: center;
-        }
+      .upload-area:hover {
+        border-color: #764ba2;
+        background: #f0f2ff;
+      }
 
-        .multiplier-label {
-            color: #666;
-            font-size: 13px;
-            margin-right: 5px;
-        }
+      .upload-area.dragover {
+        border-color: #764ba2;
+        background: #e8ebff;
+      }
 
-        .remove-btn {
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-        }
+      .upload-icon {
+        font-size: 48px;
+        margin-bottom: 15px;
+      }
 
-        .remove-btn:hover {
-            background: #c82333;
-        }
+      /* Comparison Upload Grid */
+      .comparison-uploads {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
 
-        .advanced-settings {
-            margin: 30px 0;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            overflow: hidden;
-        }
+      .comparison-upload-box {
+        border: 2px dashed #667eea;
+        border-radius: 8px;
+        padding: 30px;
+        text-align: center;
+        background: #f8f9ff;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        min-height: 200px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
 
-        .advanced-header {
-            background: #f8f9fa;
-            padding: 15px 20px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            user-select: none;
-        }
+      .comparison-upload-box:hover {
+        border-color: #764ba2;
+        background: #f0f2ff;
+      }
 
-        .advanced-header:hover {
-            background: #e9ecef;
-        }
+      .comparison-upload-box.dragover {
+        border-color: #764ba2;
+        background: #e8ebff;
+      }
 
-        .advanced-content {
-            padding: 20px;
-            display: none;
-        }
+      .comparison-upload-box h3 {
+        color: #667eea;
+        font-size: 18px;
+        margin-bottom: 10px;
+      }
 
-        .advanced-content.open {
-            display: block;
-        }
+      .comparison-upload-box .upload-icon {
+        font-size: 36px;
+        margin-bottom: 10px;
+      }
 
-        .config-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 15px;
-        }
+      .comparison-upload-box p {
+        color: #666;
+        font-size: 13px;
+      }
 
-        .config-item label {
-            display: block;
-            color: #555;
-            font-size: 13px;
-            margin-bottom: 5px;
-            font-weight: 500;
-        }
+      .comparison-upload-box.has-file {
+        border-color: #28a745;
+        background: #f0fff4;
+      }
 
-        .config-item input {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-        }
+      .uploaded-filename {
+        color: #28a745;
+        font-weight: 600;
+        font-size: 14px;
+        margin-top: 10px;
+      }
 
-        .reset-btn {
-            background: #6c757d;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
+      /* File List */
+      .file-list {
+        margin: 20px 0;
+      }
 
-        .reset-btn:hover {
-            background: #5a6268;
-        }
+      .file-item {
+        display: flex;
+        align-items: center;
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        margin-bottom: 8px;
+      }
 
-        .process-btn {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s ease;
-            margin-top: 20px;
-        }
+      .file-name {
+        flex: 1;
+        color: #333;
+        font-size: 14px;
+      }
 
-        .process-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-        }
+      .multiplier-input {
+        width: 80px;
+        padding: 6px 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin: 0 10px;
+        text-align: center;
+      }
 
-        .process-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
+      .multiplier-label {
+        color: #666;
+        font-size: 13px;
+        margin-right: 5px;
+      }
 
-        .process-btn.loading {
-            background: #999;
-        }
+      .remove-btn {
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+      }
 
-        .results {
-            margin-top: 30px;
-            padding: 20px;
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            border-radius: 8px;
-            display: none;
-        }
+      .remove-btn:hover {
+        background: #c82333;
+      }
 
-        .results.show {
-            display: block;
-        }
+      /* Buttons */
+      .process-btn {
+        width: 100%;
+        padding: 15px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+        margin-top: 20px;
+      }
 
-        .results h3 {
-            color: #155724;
-            margin-bottom: 10px;
-        }
+      .process-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+      }
 
-        .results p {
-            color: #155724;
-            margin: 5px 0;
-        }
+      .process-btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
 
-        .error {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            border-radius: 8px;
-            color: #721c24;
-            display: none;
-        }
+      .process-btn.loading {
+        background: #999;
+      }
 
-        .error.show {
-            display: block;
-        }
+      /* View Toggle for Comparison */
+      .view-toggle {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 15px;
+        margin: 20px 0;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+      }
 
-        .spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid #ffffff;
-            border-radius: 50%;
-            border-top-color: transparent;
-            animation: spin 0.8s linear infinite;
-            margin-right: 8px;
-        }
+      .view-toggle-label {
+        font-weight: 600;
+        color: #333;
+      }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+      .toggle-switch {
+        position: relative;
+        width: 60px;
+        height: 30px;
+        background: #ccc;
+        border-radius: 15px;
+        cursor: pointer;
+        transition: background 0.3s;
+      }
 
-        input[type="file"] {
-            display: none;
-        }
+      .toggle-switch.active {
+        background: #667eea;
+      }
 
-        .chevron {
-            transition: transform 0.3s ease;
-        }
+      .toggle-slider {
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 24px;
+        height: 24px;
+        background: white;
+        border-radius: 50%;
+        transition: transform 0.3s;
+      }
 
-        .chevron.open {
-            transform: rotate(180deg);
+      .toggle-switch.active .toggle-slider {
+        transform: translateX(30px);
+      }
+
+      /* Results */
+      .results {
+        margin-top: 30px;
+        padding: 20px;
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        border-radius: 8px;
+        display: none;
+      }
+
+      .results.show {
+        display: block;
+      }
+
+      .results h3 {
+        color: #155724;
+        margin-bottom: 10px;
+      }
+
+      .results p {
+        color: #155724;
+        margin: 5px 0;
+      }
+
+      /* Comparison Results */
+      .comparison-results {
+        margin-top: 30px;
+        display: none;
+      }
+
+      .comparison-results.show {
+        display: block;
+      }
+
+      .summary-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+      }
+
+      .summary-card h3 {
+        color: #333;
+        font-size: 18px;
+        margin-bottom: 15px;
+      }
+
+      .summary-item {
+        color: #666;
+        font-size: 14px;
+        margin: 8px 0;
+      }
+
+      .summary-item strong {
+        color: #333;
+      }
+
+      .comparison-table-container {
+        overflow-x: auto;
+        margin-top: 20px;
+      }
+
+      .comparison-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      .comparison-table th {
+        background: #667eea;
+        color: white;
+        padding: 12px 8px;
+        text-align: left;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+      }
+
+      .comparison-table td {
+        padding: 10px 8px;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      .comparison-table tr:hover {
+        background: #f8f9fa;
+      }
+
+      .row-added {
+        background: #d4edda !important;
+      }
+
+      .row-removed {
+        background: #f8d7da !important;
+      }
+
+      .row-changed {
+        background: #fff3cd !important;
+      }
+
+      .change-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .badge-added {
+        background: #28a745;
+        color: white;
+      }
+
+      .badge-removed {
+        background: #dc3545;
+        color: white;
+      }
+
+      .badge-changed {
+        background: #ffc107;
+        color: #333;
+      }
+
+      .section-header-row {
+        background: #e9ecef !important;
+        font-weight: 700;
+        color: #495057;
+      }
+
+      .section-header-row td {
+        padding: 15px 8px;
+        font-size: 14px;
+      }
+
+      .error {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 8px;
+        color: #721c24;
+        display: none;
+      }
+
+      .error.show {
+        display: block;
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spin 0.8s linear infinite;
+        margin-right: 8px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
         }
+      }
+
+      input[type="file"] {
+        display: none;
+      }
+
+      .export-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .export-btn {
+        padding: 12px 24px;
+        background: #28a745;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.3s;
+      }
+
+      .export-btn:hover {
+        background: #218838;
+      }
+
+      .export-btn.pdf {
+        background: #dc3545;
+      }
+
+      .export-btn.pdf:hover {
+        background: #c82333;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container">
-        <h1>BOM Consolidation Tool</h1>
-        <p class="subtitle">Consolidate multiple BOM Excel files by identifying duplicates and summing quantities</p>
+      <h1>BOM Tool</h1>
+      <p class="subtitle">
+        Consolidate multiple BOM files or compare two BOM versions
+      </p>
 
+      <!-- Tool Toggle -->
+      <div class="tool-toggle">
+        <button class="tool-tab active" data-tool="consolidate">
+          Consolidate BOMs
+        </button>
+        <button class="tool-tab" data-tool="compare">Compare BOMs</button>
+      </div>
+
+      <!-- Consolidate Tool -->
+      <div class="tool-content active" id="consolidate-content">
         <div class="upload-area" id="uploadArea">
-            <div class="upload-icon">📂</div>
-            <h3>Drop Excel files here or click to browse</h3>
-            <p style="color: #666; margin-top: 10px;">Supports .xlsx and .xls files</p>
-            <input type="file" id="fileInput" accept=".xlsx,.xls" multiple>
+          <div class="upload-icon">📂</div>
+          <h3>Drop Excel files here or click to browse</h3>
+          <p style="color: #666; margin-top: 10px">
+            Supports .xlsx and .xls files (multiple files)
+          </p>
+          <input type="file" id="fileInput" accept=".xlsx,.xls" multiple />
         </div>
 
         <div class="file-list" id="fileList"></div>
 
-        <div class="advanced-settings">
-            <div class="advanced-header" id="advancedHeader">
-                <span><strong>Advanced Settings</strong> - Column Configuration</span>
-                <span class="chevron" id="chevron">▼</span>
-            </div>
-            <div class="advanced-content" id="advancedContent">
-                <div class="config-grid">
-                    <div class="config-item">
-                        <label>Quantity Column Name:</label>
-                        <input type="text" id="colQty" value="QTY">
-                    </div>
-                    <div class="config-item">
-                        <label>SKU Column Name:</label>
-                        <input type="text" id="colSku" value="BPP SKU">
-                    </div>
-                    <div class="config-item">
-                        <label>Part Number Column Name:</label>
-                        <input type="text" id="colPartNum" value="MFR PART #">
-                    </div>
-                    <div class="config-item">
-                        <label>Manufacturer Column Name:</label>
-                        <input type="text" id="colMfr" value="MANUFACTURER">
-                    </div>
-                    <div class="config-item" style="grid-column: 1 / -1;">
-                        <label>Description Column Name:</label>
-                        <input type="text" id="colDesc" value="DESCRIPTION">
-                    </div>
-                </div>
-                <button class="reset-btn" id="resetBtn">Reset to Defaults</button>
-            </div>
-        </div>
-
         <button class="process-btn" id="processBtn" disabled>
-            Consolidate Files
+          Consolidate Files
         </button>
 
         <div class="results" id="results"></div>
         <div class="error" id="error"></div>
+      </div>
+
+      <!-- Compare Tool -->
+      <div class="tool-content" id="compare-content">
+        <div class="comparison-uploads">
+          <div class="comparison-upload-box" id="oldBomUpload">
+            <div class="upload-icon">📄</div>
+            <h3>Old BOM</h3>
+            <p>Click or drop file here</p>
+            <p class="uploaded-filename" id="oldBomFilename"></p>
+            <input type="file" id="oldBomInput" accept=".xlsx,.xls" />
+          </div>
+
+          <div class="comparison-upload-box" id="newBomUpload">
+            <div class="upload-icon">📄</div>
+            <h3>New BOM</h3>
+            <p>Click or drop file here</p>
+            <p class="uploaded-filename" id="newBomFilename"></p>
+            <input type="file" id="newBomInput" accept=".xlsx,.xls" />
+          </div>
+        </div>
+
+        <button class="process-btn" id="compareBtn" disabled>
+          Compare Files
+        </button>
+
+        <div class="comparison-results" id="comparisonResults">
+          <div class="summary-card">
+            <h3>Comparison Summary</h3>
+            <div class="summary-item">
+              <strong>Generated:</strong> <span id="summaryDate"></span>
+            </div>
+            <div class="summary-item">
+              <strong>Old BOM File:</strong> <span id="summaryOldFile"></span>
+            </div>
+            <div class="summary-item">
+              <strong>New BOM File:</strong> <span id="summaryNewFile"></span>
+            </div>
+            <div class="summary-item" style="margin-top: 15px">
+              <strong
+                >Changes (<span id="summaryViewType">Section View</span
+                >):</strong
+              >
+            </div>
+            <div class="summary-item" style="color: #28a745; margin-left: 20px">
+              Line items added: <span id="summaryAdded"></span>
+            </div>
+            <div class="summary-item" style="color: #dc3545; margin-left: 20px">
+              Line items removed: <span id="summaryRemoved"></span>
+            </div>
+            <div class="summary-item" style="color: #ffc107; margin-left: 20px">
+              Line items with changed quantity:
+              <span id="summaryChanged"></span>
+            </div>
+          </div>
+          <div class="view-toggle">
+            <span class="view-toggle-label">Section View</span>
+            <div class="toggle-switch" id="viewToggle">
+              <div class="toggle-slider"></div>
+            </div>
+            <span class="view-toggle-label">Aggregate View</span>
+          </div>
+
+          <div class="comparison-table-container">
+            <table class="comparison-table" id="comparisonTable">
+              <!-- Table content will be inserted here -->
+            </table>
+          </div>
+
+          <div class="export-buttons">
+            <button class="export-btn" id="exportBtn">
+              📥 Export to Excel
+            </button>
+            <button class="export-btn pdf" id="exportPdfBtn">
+              📄 Export to PDF
+            </button>
+          </div>
+        </div>
+
+        <div class="error" id="compareError"></div>
+      </div>
     </div>
 
     <script>
-        const files = [];
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
-        const fileList = document.getElementById('fileList');
-        const processBtn = document.getElementById('processBtn');
-        const resultsDiv = document.getElementById('results');
-        const errorDiv = document.getElementById('error');
-        const advancedHeader = document.getElementById('advancedHeader');
-        const advancedContent = document.getElementById('advancedContent');
-        const chevron = document.getElementById('chevron');
-        const resetBtn = document.getElementById('resetBtn');
+      // ==================== Shared Configuration ====================
+      const config = {
+        qty: "QTY",
+        sku: "BPP SKU",
+        partNum: "MFR PART #",
+        mfr: "MANUFACTURER",
+        desc: "DESCRIPTION",
 
-        // File upload handling
-        uploadArea.addEventListener('click', () => fileInput.click());
-        
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
+        // Section View column names (order: sku, partNum, mfr, desc, changeType, delta, oldQty, newQty)
+        sectionViewColumns: {
+          sku: "BPP SKU",
+          partNum: "MFR PART #",
+          mfr: "MANUFACTURER",
+          desc: "DESCRIPTION",
+          changeType: "Change Type",
+          delta: "Delta",
+          oldQty: "Old QTY",
+          newQty: "New QTY",
+        },
+
+        // Aggregate View column names
+        aggregateViewColumns: {
+          sku: "BPP SKU",
+          partNum: "MFR PART #",
+          mfr: "MANUFACTURER",
+          desc: "DESCRIPTION",
+          changeType: "Change Type",
+          delta: "Delta",
+          oldTotalQty: "Old Total QTY",
+          newTotalQty: "New Total QTY",
+        },
+      };
+
+      // ==================== State ====================
+      const consolidateState = {
+        files: [],
+      };
+
+      const compareState = {
+        oldBomFile: null,
+        newBomFile: null,
+        sectionComparison: null,
+        aggregateComparison: null,
+        currentView: "section",
+      };
+
+      // ==================== DOM Elements ====================
+      // Tool Toggle
+      const toolTabs = document.querySelectorAll(".tool-tab");
+      const toolContents = document.querySelectorAll(".tool-content");
+
+      // Consolidate
+      const uploadArea = document.getElementById("uploadArea");
+      const fileInput = document.getElementById("fileInput");
+      const fileList = document.getElementById("fileList");
+      const processBtn = document.getElementById("processBtn");
+      const resultsDiv = document.getElementById("results");
+      const errorDiv = document.getElementById("error");
+
+      // Compare
+      const oldBomUpload = document.getElementById("oldBomUpload");
+      const newBomUpload = document.getElementById("newBomUpload");
+      const oldBomInput = document.getElementById("oldBomInput");
+      const newBomInput = document.getElementById("newBomInput");
+      const oldBomFilename = document.getElementById("oldBomFilename");
+      const newBomFilename = document.getElementById("newBomFilename");
+      const compareBtn = document.getElementById("compareBtn");
+      const comparisonResults = document.getElementById("comparisonResults");
+      const compareError = document.getElementById("compareError");
+      const viewToggle = document.getElementById("viewToggle");
+      const comparisonTable = document.getElementById("comparisonTable");
+      const exportBtn = document.getElementById("exportBtn");
+      const exportPdfBtn = document.getElementById("exportPdfBtn");
+      const summaryDate = document.getElementById("summaryDate");
+      const summaryOldFile = document.getElementById("summaryOldFile");
+      const summaryNewFile = document.getElementById("summaryNewFile");
+      const summaryAdded = document.getElementById("summaryAdded");
+      const summaryRemoved = document.getElementById("summaryRemoved");
+      const summaryChanged = document.getElementById("summaryChanged");
+      const summaryViewType = document.getElementById("summaryViewType");
+
+      // ==================== Tool Toggle ====================
+      toolTabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+          const tool = tab.dataset.tool;
+
+          toolTabs.forEach((t) => t.classList.remove("active"));
+          toolContents.forEach((c) => c.classList.remove("active"));
+
+          tab.classList.add("active");
+          document.getElementById(`${tool}-content`).classList.add("active");
         });
+      });
 
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
+      // ==================== CONSOLIDATE TOOL ====================
 
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            handleFiles(e.dataTransfer.files);
-        });
+      // File upload handling
+      uploadArea.addEventListener("click", () => fileInput.click());
 
-        fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files);
-        });
+      uploadArea.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        uploadArea.classList.add("dragover");
+      });
 
-        function handleFiles(newFiles) {
-            for (let file of newFiles) {
-                if (file.name.match(/\.(xlsx|xls)$/i)) {
-                    files.push({ file, multiplier: 1 });
-                }
-            }
-            renderFileList();
-            updateProcessBtn();
+      uploadArea.addEventListener("dragleave", () => {
+        uploadArea.classList.remove("dragover");
+      });
+
+      uploadArea.addEventListener("drop", (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove("dragover");
+        handleFiles(e.dataTransfer.files);
+      });
+
+      fileInput.addEventListener("change", (e) => {
+        handleFiles(e.target.files);
+      });
+
+      // Process button
+      processBtn.addEventListener("click", async () => {
+        resultsDiv.classList.remove("show");
+        errorDiv.classList.remove("show");
+
+        processBtn.disabled = true;
+        processBtn.innerHTML = '<span class="spinner"></span>Processing...';
+        processBtn.classList.add("loading");
+
+        try {
+          const result = await processFiles(consolidateState.files, config);
+
+          resultsDiv.innerHTML = `
+                    <h3>✓ Success!</h3>
+                    <p>Consolidated ${result.itemCount} items from ${
+            consolidateState.files.length
+          } file(s)</p>
+                    <p>File downloaded as: ${result.filename}</p>
+                    ${
+                      result.warnings.length > 0
+                        ? `<p style="color: #856404; margin-top: 10px;">⚠ ${result.warnings.length} warning(s) - see Consolidation Summary sheet</p>`
+                        : ""
+                    }
+                `;
+          resultsDiv.classList.add("show");
+        } catch (err) {
+          errorDiv.textContent = err.message;
+          errorDiv.classList.add("show");
+        } finally {
+          processBtn.disabled = false;
+          processBtn.innerHTML = "Consolidate Files";
+          processBtn.classList.remove("loading");
+        }
+      });
+
+      function handleFiles(newFiles) {
+        for (let file of newFiles) {
+          if (file.name.match(/\.(xlsx|xls)$/i)) {
+            consolidateState.files.push({ file, multiplier: 1 });
+          }
+        }
+        renderFileList();
+        updateProcessBtn();
+      }
+
+      function renderFileList() {
+        if (consolidateState.files.length === 0) {
+          fileList.innerHTML = "";
+          return;
         }
 
-        function renderFileList() {
-            if (files.length === 0) {
-                fileList.innerHTML = '';
-                return;
-            }
-
-            fileList.innerHTML = files.map((item, index) => `
+        fileList.innerHTML = consolidateState.files
+          .map(
+            (item, index) => `
                 <div class="file-item">
                     <span class="file-name">${item.file.name}</span>
                     <span class="multiplier-label">Multiplier:</span>
@@ -386,329 +796,1351 @@
                            min="1" step="1" data-index="${index}">
                     <button class="remove-btn" data-index="${index}">Remove</button>
                 </div>
-            `).join('');
+            `
+          )
+          .join("");
 
-            // Add event listeners
-            document.querySelectorAll('.multiplier-input').forEach(input => {
-                input.addEventListener('change', (e) => {
-                    const idx = parseInt(e.target.dataset.index);
-                    let val = parseInt(e.target.value);
-                    if (isNaN(val) || val < 1) val = 1;
-                    files[idx].multiplier = val;
-                    e.target.value = val;
-                });
-            });
-
-            document.querySelectorAll('.remove-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const idx = parseInt(e.target.dataset.index);
-                    files.splice(idx, 1);
-                    renderFileList();
-                    updateProcessBtn();
-                });
-            });
-        }
-
-        function updateProcessBtn() {
-            processBtn.disabled = files.length === 0;
-        }
-
-        // Advanced settings toggle
-        advancedHeader.addEventListener('click', () => {
-            advancedContent.classList.toggle('open');
-            chevron.classList.toggle('open');
+        document.querySelectorAll(".multiplier-input").forEach((input) => {
+          input.addEventListener("change", (e) => {
+            const idx = parseInt(e.target.dataset.index);
+            let val = parseInt(e.target.value);
+            if (isNaN(val) || val < 1) val = 1;
+            consolidateState.files[idx].multiplier = val;
+            e.target.value = val;
+          });
         });
 
-        resetBtn.addEventListener('click', () => {
-            document.getElementById('colQty').value = 'QTY';
-            document.getElementById('colSku').value = 'BPP SKU';
-            document.getElementById('colPartNum').value = 'MFR PART #';
-            document.getElementById('colMfr').value = 'MANUFACTURER';
-            document.getElementById('colDesc').value = 'DESCRIPTION';
+        document.querySelectorAll(".remove-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            const idx = parseInt(e.target.dataset.index);
+            consolidateState.files.splice(idx, 1);
+            renderFileList();
+            updateProcessBtn();
+          });
         });
+      }
 
-        // Process button
-        processBtn.addEventListener('click', async () => {
-            resultsDiv.classList.remove('show');
-            errorDiv.classList.remove('show');
-            
-            processBtn.disabled = true;
-            processBtn.innerHTML = '<span class="spinner"></span>Processing...';
-            processBtn.classList.add('loading');
+      function updateProcessBtn() {
+        processBtn.disabled = consolidateState.files.length === 0;
+      }
 
+      async function processFiles(fileItems, config) {
+        const allData = [];
+        const warnings = [];
+        const fileInfos = [];
+
+        for (let item of fileItems) {
+          try {
+            const data = await readExcelFile(
+              item.file,
+              config,
+              item.multiplier
+            );
+            allData.push(...data);
+            fileInfos.push({
+              name: item.file.name,
+              multiplier: item.multiplier,
+              status: "success",
+            });
+          } catch (err) {
+            warnings.push(`File '${item.file.name}' skipped - ${err.message}`);
+            fileInfos.push({
+              name: item.file.name,
+              multiplier: item.multiplier,
+              status: "error",
+              error: err.message,
+            });
+          }
+        }
+
+        if (allData.length === 0) {
+          throw new Error(
+            "No valid data found in any files. " +
+              (warnings.length > 0 ? `Errors: ${warnings.join("; ")}` : "")
+          );
+        }
+
+        const consolidated = consolidateData(allData, config);
+        sortData(consolidated);
+
+        const filename = "Consolidated BOM.xlsx";
+        generateConsolidatedExcel(
+          consolidated,
+          config,
+          filename,
+          fileInfos,
+          warnings
+        );
+
+        return { itemCount: consolidated.length, filename, warnings };
+      }
+
+      function consolidateData(data, config) {
+        const map = new Map();
+
+        for (let item of data) {
+          const key = item.partNum;
+
+          if (map.has(key)) {
+            map.get(key).qty += item.qty;
+          } else {
+            map.set(key, { ...item });
+          }
+        }
+
+        return Array.from(map.values());
+      }
+
+      function sortData(data) {
+        data.sort((a, b) => {
+          const mfrA = a.mfr.toUpperCase();
+          const mfrB = b.mfr.toUpperCase();
+
+          if (mfrA < mfrB) return -1;
+          if (mfrA > mfrB) return 1;
+
+          const partA = a.partNum.toUpperCase();
+          const partB = b.partNum.toUpperCase();
+
+          if (partA < partB) return -1;
+          if (partA > partB) return 1;
+
+          return 0;
+        });
+      }
+
+      function generateConsolidatedExcel(
+        data,
+        config,
+        filename,
+        fileInfos,
+        warnings
+      ) {
+        const wb = XLSX.utils.book_new();
+
+        const wsData = [
+          ["BILL OF MATERIAL"],
+          [config.qty, config.sku, config.partNum, config.mfr, config.desc],
+        ];
+
+        for (let item of data) {
+          wsData.push([item.qty, item.sku, item.partNum, item.mfr, item.desc]);
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+        const colWidths = [];
+        for (let colIdx = 0; colIdx < 5; colIdx++) {
+          if (colIdx === 4) {
+            colWidths.push({ wch: 255 });
+          } else {
+            let maxWidth = 10;
+            for (let rowIdx = 0; rowIdx < wsData.length; rowIdx++) {
+              const cellValue = wsData[rowIdx][colIdx];
+              if (cellValue) {
+                const cellLength = cellValue.toString().length;
+                maxWidth = Math.max(maxWidth, cellLength);
+              }
+            }
+            colWidths.push({ wch: maxWidth + 2 });
+          }
+        }
+        ws["!cols"] = colWidths;
+        ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }];
+
+        XLSX.utils.book_append_sheet(wb, ws, "Bill of Material");
+
+        const now = new Date();
+        const dateStr = now.toUTCString();
+
+        const summaryData = [
+          ["CONSOLIDATION SUMMARY"],
+          [],
+          [`Generated: ${dateStr}`],
+          [],
+          ["File Name", "Multiplier"],
+        ];
+
+        for (let info of fileInfos) {
+          summaryData.push([info.name, info.multiplier]);
+        }
+
+        if (warnings.length > 0) {
+          summaryData.push([]);
+          summaryData.push(["Warnings and Errors"]);
+          for (let warning of warnings) {
+            summaryData.push([warning]);
+          }
+        }
+
+        const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+        const summaryColWidths = [{ wch: 50 }, { wch: 12 }];
+        wsSummary["!cols"] = summaryColWidths;
+
+        XLSX.utils.book_append_sheet(wb, wsSummary, "Consolidation Summary");
+
+        XLSX.writeFile(wb, filename);
+      }
+
+      // ==================== COMPARE TOOL ====================
+
+      // Old BOM Upload
+      oldBomUpload.addEventListener("click", () => oldBomInput.click());
+      oldBomUpload.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        oldBomUpload.classList.add("dragover");
+      });
+      oldBomUpload.addEventListener("dragleave", () => {
+        oldBomUpload.classList.remove("dragover");
+      });
+      oldBomUpload.addEventListener("drop", (e) => {
+        e.preventDefault();
+        oldBomUpload.classList.remove("dragover");
+        if (e.dataTransfer.files.length > 0) {
+          handleCompareFile(e.dataTransfer.files[0], "old");
+        }
+      });
+      oldBomInput.addEventListener("change", (e) => {
+        if (e.target.files.length > 0) {
+          handleCompareFile(e.target.files[0], "old");
+        }
+      });
+
+      // New BOM Upload
+      newBomUpload.addEventListener("click", () => newBomInput.click());
+      newBomUpload.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        newBomUpload.classList.add("dragover");
+      });
+      newBomUpload.addEventListener("dragleave", () => {
+        newBomUpload.classList.remove("dragover");
+      });
+      newBomUpload.addEventListener("drop", (e) => {
+        e.preventDefault();
+        newBomUpload.classList.remove("dragover");
+        if (e.dataTransfer.files.length > 0) {
+          handleCompareFile(e.dataTransfer.files[0], "new");
+        }
+      });
+      newBomInput.addEventListener("change", (e) => {
+        if (e.target.files.length > 0) {
+          handleCompareFile(e.target.files[0], "new");
+        }
+      });
+
+      function handleCompareFile(file, type) {
+        if (!file.name.match(/\.(xlsx|xls)$/i)) return;
+
+        if (type === "old") {
+          compareState.oldBomFile = file;
+          oldBomFilename.textContent = file.name;
+          oldBomUpload.classList.add("has-file");
+        } else {
+          compareState.newBomFile = file;
+          newBomFilename.textContent = file.name;
+          newBomUpload.classList.add("has-file");
+        }
+
+        updateCompareBtn();
+      }
+
+      function updateCompareBtn() {
+        compareBtn.disabled = !(
+          compareState.oldBomFile && compareState.newBomFile
+        );
+      }
+
+      // Compare button
+      compareBtn.addEventListener("click", async () => {
+        comparisonResults.classList.remove("show");
+        compareError.classList.remove("show");
+        compareBtn.disabled = true;
+        compareBtn.innerHTML = '<span class="spinner"></span>Comparing...';
+        compareBtn.classList.add("loading");
+        try {
+          await compareFiles();
+
+          // Comparison summary
+          const now = new Date();
+          summaryDate.textContent = now.toUTCString();
+          summaryOldFile.textContent = compareState.oldBomFile.name;
+          summaryNewFile.textContent = compareState.newBomFile.name;
+
+          // Update statistics based on current view
+          updateSummaryStatistics();
+
+          renderComparisonTable();
+          comparisonResults.classList.add("show");
+        } catch (err) {
+          compareError.textContent = err.message;
+          compareError.classList.add("show");
+        } finally {
+          compareBtn.disabled = false;
+          compareBtn.innerHTML = "Compare Files";
+          compareBtn.classList.remove("loading");
+        }
+      });
+
+      // View toggle
+      viewToggle.addEventListener("click", () => {
+        compareState.currentView =
+          compareState.currentView === "section" ? "aggregate" : "section";
+        viewToggle.classList.toggle("active");
+        updateSummaryStatistics();
+        renderComparisonTable();
+      });
+
+      function updateSummaryStatistics() {
+        let addedCount = 0,
+          removedCount = 0,
+          changedCount = 0;
+
+        if (compareState.currentView === "section") {
+          // Section view statistics
+          compareState.sectionComparison.forEach((section) => {
+            section.items.forEach((item) => {
+              if (item.changeType === "Added") addedCount++;
+              else if (item.changeType === "Removed") removedCount++;
+              else if (item.changeType === "Quantity") changedCount++;
+            });
+          });
+          summaryViewType.textContent = "Section View";
+        } else {
+          // Aggregate view statistics
+          compareState.aggregateComparison.forEach((item) => {
+            if (item.changeType === "Added") addedCount++;
+            else if (item.changeType === "Removed") removedCount++;
+            else if (item.changeType === "Quantity") changedCount++;
+          });
+          summaryViewType.textContent = "Aggregate View";
+        }
+
+        summaryAdded.textContent = addedCount;
+        summaryRemoved.textContent = removedCount;
+        summaryChanged.textContent = changedCount;
+      }
+
+      // Export button
+      exportBtn.addEventListener("click", () => {
+        exportComparisonToExcel();
+      });
+
+      // Export PDF button
+      exportPdfBtn.addEventListener("click", () => {
+        exportComparisonToPDF();
+      });
+
+      async function compareFiles() {
+        // Read both files
+        const oldData = await readExcelFileWithSections(
+          compareState.oldBomFile,
+          config
+        );
+        const newData = await readExcelFileWithSections(
+          compareState.newBomFile,
+          config
+        );
+
+        // Perform both comparisons
+        compareState.sectionComparison = performSectionComparison(
+          oldData,
+          newData
+        );
+        compareState.aggregateComparison = performAggregateComparison(
+          oldData,
+          newData
+        );
+      }
+
+      async function readExcelFileWithSections(file, config) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+
+          reader.onload = (e) => {
             try {
-                const config = {
-                    qty: document.getElementById('colQty').value.trim(),
-                    sku: document.getElementById('colSku').value.trim(),
-                    partNum: document.getElementById('colPartNum').value.trim(),
-                    mfr: document.getElementById('colMfr').value.trim(),
-                    desc: document.getElementById('colDesc').value.trim()
-                };
+              const data = new Uint8Array(e.target.result);
+              const workbook = XLSX.read(data, { type: "array" });
 
-                const result = await processFiles(files, config);
-                
-                resultsDiv.innerHTML = `
-                    <h3>✓ Success!</h3>
-                    <p>Consolidated ${result.itemCount} items from ${files.length} file(s)</p>
-                    <p>File downloaded as: ${result.filename}</p>
-                    ${result.warnings.length > 0 ? `<p style="color: #856404; margin-top: 10px;">⚠ ${result.warnings.length} warning(s) - see Consolidation Summary sheet</p>` : ''}
-                `;
-                resultsDiv.classList.add('show');
+              if (workbook.SheetNames.length === 0) {
+                reject(new Error(`No sheets found in ${file.name}`));
+                return;
+              }
+
+              const sheet = workbook.Sheets[workbook.SheetNames[0]];
+              const rows = XLSX.utils.sheet_to_json(sheet, {
+                header: 1,
+                defval: "",
+              });
+
+              if (rows.length === 0) {
+                reject(new Error(`Empty file: ${file.name}`));
+                return;
+              }
+
+              // Parse sections
+              const sections = [];
+              let unnamedCount = 0;
+
+              for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const normalized = row.map((h) =>
+                  (h || "").toString().trim().toUpperCase()
+                );
+
+                const qtyIdx = normalized.indexOf(config.qty.toUpperCase());
+                const skuIdx = normalized.indexOf(config.sku.toUpperCase());
+                const partNumIdx = normalized.indexOf(
+                  config.partNum.toUpperCase()
+                );
+                const mfrIdx = normalized.indexOf(config.mfr.toUpperCase());
+                const descIdx = normalized.indexOf(config.desc.toUpperCase());
+
+                if (qtyIdx !== -1 && partNumIdx !== -1) {
+                  // Found header row
+                  let sectionName = "Unnamed Section";
+                  if (i > 0) {
+                    const prevRow = rows[i - 1];
+                    const firstCell = (prevRow[0] || "").toString().trim();
+                    if (firstCell) {
+                      sectionName = firstCell;
+                    } else {
+                      unnamedCount++;
+                      sectionName = `Unnamed Section #${unnamedCount}`;
+                    }
+                  } else {
+                    unnamedCount++;
+                    sectionName = `Unnamed Section #${unnamedCount}`;
+                  }
+
+                  const colMap = {
+                    qtyIdx,
+                    skuIdx,
+                    partNumIdx,
+                    mfrIdx,
+                    descIdx,
+                  };
+                  const items = [];
+
+                  // Extract items for this section
+                  for (let j = i + 1; j < rows.length; j++) {
+                    const dataRow = rows[j];
+
+                    // Check if we hit another header row
+                    const checkNormalized = dataRow.map((h) =>
+                      (h || "").toString().trim().toUpperCase()
+                    );
+                    if (
+                      checkNormalized.indexOf(config.qty.toUpperCase()) !==
+                        -1 &&
+                      checkNormalized.indexOf(config.partNum.toUpperCase()) !==
+                        -1
+                    ) {
+                      break;
+                    }
+
+                    const qty = dataRow[colMap.qtyIdx];
+                    const partNum = (dataRow[colMap.partNumIdx] || "")
+                      .toString()
+                      .trim();
+
+                    if (
+                      !partNum ||
+                      qty === undefined ||
+                      qty === null ||
+                      qty === ""
+                    )
+                      continue;
+
+                    const qtyNum = parseFloat(qty);
+                    if (isNaN(qtyNum)) continue;
+
+                    items.push({
+                      section: sectionName,
+                      qty: qtyNum,
+                      sku:
+                        colMap.skuIdx !== -1
+                          ? (dataRow[colMap.skuIdx] || "").toString().trim()
+                          : "",
+                      partNum: partNum,
+                      mfr:
+                        colMap.mfrIdx !== -1
+                          ? (dataRow[colMap.mfrIdx] || "").toString().trim()
+                          : "",
+                      desc:
+                        colMap.descIdx !== -1
+                          ? (dataRow[colMap.descIdx] || "").toString().trim()
+                          : "",
+                    });
+                  }
+
+                  sections.push({
+                    name: sectionName,
+                    items: items,
+                  });
+                }
+              }
+
+              if (sections.length === 0) {
+                reject(new Error(`No valid sections found in ${file.name}`));
+                return;
+              }
+
+              resolve(sections);
             } catch (err) {
-                errorDiv.textContent = err.message;
-                errorDiv.classList.add('show');
-            } finally {
-                processBtn.disabled = false;
-                processBtn.innerHTML = 'Consolidate Files';
-                processBtn.classList.remove('loading');
+              reject(
+                new Error(`Error processing ${file.name}: ${err.message}`)
+              );
             }
+          };
+
+          reader.onerror = () =>
+            reject(new Error(`Failed to read ${file.name}`));
+          reader.readAsArrayBuffer(file);
+        });
+      }
+
+      function performSectionComparison(oldSections, newSections) {
+        const results = [];
+
+        // Create maps for quick lookup
+        const oldMap = new Map();
+        oldSections.forEach((section) => {
+          section.items.forEach((item) => {
+            const key = `${section.name}|||${item.partNum}`;
+            oldMap.set(key, item);
+          });
         });
 
-        async function processFiles(fileItems, config) {
-            const allData = [];
-            const warnings = [];
-            const fileInfos = [];
+        const newMap = new Map();
+        newSections.forEach((section) => {
+          section.items.forEach((item) => {
+            const key = `${section.name}|||${item.partNum}`;
+            newMap.set(key, item);
+          });
+        });
 
-            for (let item of fileItems) {
-                try {
-                    const data = await readExcelFile(item.file, config, item.multiplier);
-                    allData.push(...data);
-                    fileInfos.push({
-                        name: item.file.name,
-                        multiplier: item.multiplier,
-                        status: 'success'
-                    });
-                } catch (err) {
-                    warnings.push(`File '${item.file.name}' skipped - ${err.message}`);
-                    fileInfos.push({
-                        name: item.file.name,
-                        multiplier: item.multiplier,
-                        status: 'error',
-                        error: err.message
-                    });
-                }
+        // Process by section from new BOM
+        newSections.forEach((section) => {
+          const sectionResults = {
+            sectionName: section.name,
+            items: [],
+          };
+
+          section.items.forEach((newItem) => {
+            const key = `${section.name}|||${newItem.partNum}`;
+            const oldItem = oldMap.get(key);
+
+            if (!oldItem || oldItem.qty === 0) {
+              // Added
+              sectionResults.items.push({
+                changeType: "Added",
+                sku: newItem.sku,
+                partNum: newItem.partNum,
+                mfr: newItem.mfr,
+                desc: newItem.desc,
+                oldQty: 0,
+                newQty: newItem.qty,
+                delta: newItem.qty,
+              });
+            } else if (oldItem.qty !== newItem.qty) {
+              // Quantity changed
+              sectionResults.items.push({
+                changeType: "Quantity",
+                sku: newItem.sku,
+                partNum: newItem.partNum,
+                mfr: newItem.mfr,
+                desc: newItem.desc,
+                oldQty: oldItem.qty,
+                newQty: newItem.qty,
+                delta: newItem.qty - oldItem.qty,
+              });
             }
+          });
 
-            if (allData.length === 0) {
-                throw new Error('No valid data found in any files. ' + 
-                    (warnings.length > 0 ? `Errors: ${warnings.join('; ')}` : ''));
-            }
+          // Check for removed items in this section
+          const oldSection = oldSections.find((s) => s.name === section.name);
+          if (oldSection) {
+            oldSection.items.forEach((oldItem) => {
+              const key = `${section.name}|||${oldItem.partNum}`;
+              const newItem = newMap.get(key);
 
-            // Consolidate duplicates
-            const consolidated = consolidateData(allData, config);
-
-            // Sort
-            sortData(consolidated);
-
-            // Generate Excel with summary sheet
-            const filename = 'Consolidated BOM.xlsx';
-            generateExcel(consolidated, config, filename, fileInfos, warnings);
-
-            return { itemCount: consolidated.length, filename, warnings };
-        }
-
-        function readExcelFile(file, config, multiplier) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                
-                reader.onload = (e) => {
-                    try {
-                        const data = new Uint8Array(e.target.result);
-                        const workbook = XLSX.read(data, { type: 'array' });
-                        
-                        if (workbook.SheetNames.length === 0) {
-                            reject(new Error(`No sheets found`));
-                            return;
-                        }
-
-                        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-
-                        if (rows.length === 0) {
-                            reject(new Error(`Empty file`));
-                            return;
-                        }
-
-                        // Find header row
-                        let headerRowIdx = -1;
-                        let colMap = {};
-
-                        for (let i = 0; i < rows.length; i++) {
-                            const row = rows[i];
-                            const normalized = row.map(h => (h || '').toString().trim().toUpperCase());
-                            
-                            const qtyIdx = normalized.indexOf(config.qty.toUpperCase());
-                            const skuIdx = normalized.indexOf(config.sku.toUpperCase());
-                            const partNumIdx = normalized.indexOf(config.partNum.toUpperCase());
-                            const mfrIdx = normalized.indexOf(config.mfr.toUpperCase());
-                            const descIdx = normalized.indexOf(config.desc.toUpperCase());
-
-                            if (qtyIdx !== -1 && partNumIdx !== -1) {
-                                headerRowIdx = i;
-                                colMap = { qtyIdx, skuIdx, partNumIdx, mfrIdx, descIdx };
-                                break;
-                            }
-                        }
-
-                        if (headerRowIdx === -1) {
-                            reject(new Error(`Required columns not found`));
-                            return;
-                        }
-
-                        // Extract data
-                        const extractedData = [];
-                        for (let i = headerRowIdx + 1; i < rows.length; i++) {
-                            const row = rows[i];
-                            
-                            const qty = row[colMap.qtyIdx];
-                            const partNum = (row[colMap.partNumIdx] || '').toString().trim();
-
-                            // Skip if missing qty or part number
-                            if (!partNum || qty === undefined || qty === null || qty === '') continue;
-
-                            const qtyNum = parseFloat(qty);
-                            if (isNaN(qtyNum)) continue;
-
-                            extractedData.push({
-                                qty: qtyNum * multiplier,
-                                sku: colMap.skuIdx !== -1 ? (row[colMap.skuIdx] || '').toString().trim() : '',
-                                partNum: partNum,
-                                mfr: colMap.mfrIdx !== -1 ? (row[colMap.mfrIdx] || '').toString().trim() : '',
-                                desc: colMap.descIdx !== -1 ? (row[colMap.descIdx] || '').toString().trim() : ''
-                            });
-                        }
-
-                        if (extractedData.length === 0) {
-                            reject(new Error(`No valid data rows found`));
-                            return;
-                        }
-
-                        resolve(extractedData);
-                    } catch (err) {
-                        reject(new Error(`Error processing file: ${err.message}`));
-                    }
-                };
-
-                reader.onerror = () => reject(new Error(`Failed to read file`));
-                reader.readAsArrayBuffer(file);
+              if (!newItem || newItem.qty === 0) {
+                // Removed
+                sectionResults.items.push({
+                  changeType: "Removed",
+                  sku: oldItem.sku,
+                  partNum: oldItem.partNum,
+                  mfr: oldItem.mfr,
+                  desc: oldItem.desc,
+                  oldQty: oldItem.qty,
+                  newQty: 0,
+                  delta: -oldItem.qty,
+                });
+              }
             });
-        }
+          }
 
-        function consolidateData(data, config) {
-            const map = new Map();
+          if (sectionResults.items.length > 0) {
+            results.push(sectionResults);
+          }
+        });
 
-            for (let item of data) {
-                const key = item.partNum;
-                
-                if (map.has(key)) {
-                    map.get(key).qty += item.qty;
-                } else {
-                    map.set(key, { ...item });
-                }
+        return results;
+      }
+
+      function performAggregateComparison(oldSections, newSections) {
+        // Aggregate by part number
+        const oldMap = new Map();
+        oldSections.forEach((section) => {
+          section.items.forEach((item) => {
+            if (oldMap.has(item.partNum)) {
+              oldMap.get(item.partNum).qty += item.qty;
+            } else {
+              oldMap.set(item.partNum, { ...item });
             }
+          });
+        });
 
-            return Array.from(map.values());
-        }
+        const newMap = new Map();
+        const newOrder = [];
+        newSections.forEach((section) => {
+          section.items.forEach((item) => {
+            if (newMap.has(item.partNum)) {
+              newMap.get(item.partNum).qty += item.qty;
+            } else {
+              newMap.set(item.partNum, { ...item });
+              newOrder.push(item.partNum);
+            }
+          });
+        });
 
-        function sortData(data) {
-            data.sort((a, b) => {
-                const mfrA = a.mfr.toUpperCase();
-                const mfrB = b.mfr.toUpperCase();
-                
-                if (mfrA < mfrB) return -1;
-                if (mfrA > mfrB) return 1;
-                
-                const partA = a.partNum.toUpperCase();
-                const partB = b.partNum.toUpperCase();
-                
-                if (partA < partB) return -1;
-                if (partA > partB) return 1;
-                
-                return 0;
+        const results = [];
+
+        // Process in new BOM order
+        newOrder.forEach((partNum) => {
+          const newItem = newMap.get(partNum);
+          const oldItem = oldMap.get(partNum);
+
+          if (!oldItem || oldItem.qty === 0) {
+            // Added
+            results.push({
+              changeType: "Added",
+              sku: newItem.sku,
+              partNum: newItem.partNum,
+              mfr: newItem.mfr,
+              desc: newItem.desc,
+              oldTotalQty: 0,
+              newTotalQty: newItem.qty,
+              delta: newItem.qty,
             });
+          } else if (oldItem.qty !== newItem.qty) {
+            // Quantity changed
+            results.push({
+              changeType: "Quantity",
+              sku: newItem.sku,
+              partNum: newItem.partNum,
+              mfr: newItem.mfr,
+              desc: newItem.desc,
+              oldTotalQty: oldItem.qty,
+              newTotalQty: newItem.qty,
+              delta: newItem.qty - oldItem.qty,
+            });
+          }
+        });
+
+        // Check for removed items
+        oldMap.forEach((oldItem, partNum) => {
+          const newItem = newMap.get(partNum);
+          if (!newItem || newItem.qty === 0) {
+            results.push({
+              changeType: "Removed",
+              sku: oldItem.sku,
+              partNum: oldItem.partNum,
+              mfr: oldItem.mfr,
+              desc: oldItem.desc,
+              oldTotalQty: oldItem.qty,
+              newTotalQty: 0,
+              delta: -oldItem.qty,
+            });
+          }
+        });
+
+        return results;
+      }
+
+      function renderComparisonTable() {
+        if (compareState.currentView === "section") {
+          renderSectionView();
+        } else {
+          renderAggregateView();
         }
+      }
 
-        function generateExcel(data, config, filename, fileInfos, warnings) {
-            const wb = XLSX.utils.book_new();
-            
-            // Sheet 1: Bill of Material
-            const wsData = [
-                ['BILL OF MATERIAL'],
-                [config.qty, config.sku, config.partNum, config.mfr, config.desc]
-            ];
+      function renderSectionView() {
+        const results = compareState.sectionComparison;
 
-            for (let item of data) {
-                wsData.push([item.qty, item.sku, item.partNum, item.mfr, item.desc]);
+        let html = `
+                <thead>
+                    <tr>
+                        <th>${config.sectionViewColumns.sku}</th>
+                        <th>${config.sectionViewColumns.partNum}</th>
+                        <th>${config.sectionViewColumns.mfr}</th>
+                        <th>${config.sectionViewColumns.desc}</th>
+                        <th>${config.sectionViewColumns.changeType}</th>
+                        <th>${config.sectionViewColumns.oldQty}</th>
+                        <th>${config.sectionViewColumns.newQty}</th>
+                        <th>${config.sectionViewColumns.delta}</th>
+                        </tr>
+                </thead>
+                <tbody>
+            `;
+
+        results.forEach((section) => {
+          // Section header
+          html += `
+                    <tr class="section-header-row">
+                        <td colspan="8">${section.sectionName}</td>
+                    </tr>
+                `;
+
+          section.items.forEach((item) => {
+            const rowClass =
+              item.changeType === "Added"
+                ? "row-added"
+                : item.changeType === "Removed"
+                ? "row-removed"
+                : "row-changed";
+            const badgeClass =
+              item.changeType === "Added"
+                ? "badge-added"
+                : item.changeType === "Removed"
+                ? "badge-removed"
+                : "badge-changed";
+
+            html += `
+                        <tr class="${rowClass}">
+                            <td>${item.sku}</td>
+                            <td>${item.partNum}</td>
+                            <td>${item.mfr}</td>
+                            <td>${item.desc}</td>
+                            <td><span class="change-badge ${badgeClass}">${
+              item.changeType
+            }</span></td>
+                            <td>${item.oldQty === null ? "-" : item.oldQty}</td>
+                            <td>${item.newQty}</td>
+                            <td>${
+                              item.delta === null
+                                ? "-"
+                                : (item.delta > 0 ? "+" : "") + item.delta
+                            }</td>
+                        </tr>
+                    `;
+          });
+        });
+
+        html += "</tbody>";
+        comparisonTable.innerHTML = html;
+      }
+
+      function renderAggregateView() {
+        const results = compareState.aggregateComparison;
+
+        let html = `
+                <thead>
+                    <tr>
+                        <th>${config.aggregateViewColumns.sku}</th>
+                        <th>${config.aggregateViewColumns.partNum}</th>
+                        <th>${config.aggregateViewColumns.mfr}</th>
+                        <th>${config.aggregateViewColumns.desc}</th>
+                        <th>${config.aggregateViewColumns.changeType}</th>
+                        <th>${config.aggregateViewColumns.oldTotalQty}</th>
+                        <th>${config.aggregateViewColumns.newTotalQty}</th>
+                        <th>${config.aggregateViewColumns.delta}</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+
+        results.forEach((item) => {
+          const rowClass =
+            item.changeType === "Added"
+              ? "row-added"
+              : item.changeType === "Removed"
+              ? "row-removed"
+              : "row-changed";
+          const badgeClass =
+            item.changeType === "Added"
+              ? "badge-added"
+              : item.changeType === "Removed"
+              ? "badge-removed"
+              : "badge-changed";
+
+          html += `
+                    <tr class="${rowClass}">
+                        <td>${item.sku}</td>
+                        <td>${item.partNum}</td>
+                        <td>${item.mfr}</td>
+                        <td>${item.desc}</td>
+                        <td><span class="change-badge ${badgeClass}">${
+            item.changeType
+          }</span></td>
+                        <td>${
+                          item.oldTotalQty === null ? "-" : item.oldTotalQty
+                        }</td>
+                        <td>${item.newTotalQty}</td>
+                        <td>${
+                          item.delta === null
+                            ? "-"
+                            : (item.delta > 0 ? "+" : "") + item.delta
+                        }</td>
+                    </tr>
+                `;
+        });
+
+        html += "</tbody>";
+        comparisonTable.innerHTML = html;
+      }
+
+      function exportComparisonToExcel() {
+        const wb = XLSX.utils.book_new();
+
+        // Sheet 1: Section Comparison
+        const sectionData = [];
+        compareState.sectionComparison.forEach((section) => {
+          // Section row
+          sectionData.push([section.sectionName]);
+
+          // Header row
+          sectionData.push([
+            config.sectionViewColumns.sku,
+            config.sectionViewColumns.partNum,
+            config.sectionViewColumns.mfr,
+            config.sectionViewColumns.desc,
+            config.sectionViewColumns.changeType,
+            config.sectionViewColumns.oldQty,
+            config.sectionViewColumns.newQty,
+            config.sectionViewColumns.delta,
+          ]);
+
+          // Items
+          section.items.forEach((item) => {
+            sectionData.push([
+              item.sku,
+              item.partNum,
+              item.mfr,
+              item.desc,
+              item.changeType,
+              item.oldQty === null ? "-" : item.oldQty,
+              item.newQty,
+              item.delta === null ? "-" : item.delta,
+            ]);
+          });
+
+          // Empty row between sections
+          sectionData.push([]);
+        });
+
+        const wsSec = XLSX.utils.aoa_to_sheet(sectionData);
+
+        // Apply colors to section sheet
+        let rowIdx = 0;
+        compareState.sectionComparison.forEach((section) => {
+          // Skip section row and header
+          rowIdx += 2;
+
+          section.items.forEach((item) => {
+            const fillColor =
+              item.changeType === "Added"
+                ? "D4EDDA"
+                : item.changeType === "Removed"
+                ? "F8D7DA"
+                : "FFF3CD";
+
+            for (let col = 0; col < 8; col++) {
+              const cellRef = XLSX.utils.encode_cell({ r: rowIdx, c: col });
+              if (!wsSec[cellRef]) wsSec[cellRef] = { t: "s", v: "" };
+              wsSec[cellRef].s = { fill: { fgColor: { rgb: fillColor } } };
             }
+            rowIdx++;
+          });
 
-            const ws = XLSX.utils.aoa_to_sheet(wsData);
+          rowIdx++; // Empty row
+        });
 
-            // Auto-fit column widths (except Description)
-            const colWidths = [];
-            for (let colIdx = 0; colIdx < 5; colIdx++) {
-                if (colIdx === 4) {
-                    // Description column - set to 255
-                    colWidths.push({ wch: 255 });
-                } else {
-                    // Auto-fit for QTY, SKU, PART NUM, MFR
-                    let maxWidth = 10;
-                    for (let rowIdx = 0; rowIdx < wsData.length; rowIdx++) {
-                        const cellValue = wsData[rowIdx][colIdx];
-                        if (cellValue) {
-                            const cellLength = cellValue.toString().length;
-                            maxWidth = Math.max(maxWidth, cellLength);
-                        }
-                    }
-                    colWidths.push({ wch: maxWidth + 2 });
+        wsSec["!cols"] = [
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 30 },
+          { wch: 15 },
+          { wch: 10 },
+          { wch: 10 },
+          { wch: 10 },
+        ];
+
+        XLSX.utils.book_append_sheet(wb, wsSec, "Section Comparison");
+
+        // Sheet 2: Aggregate Comparison
+        const aggData = [
+          [
+            config.aggregateViewColumns.sku,
+            config.aggregateViewColumns.partNum,
+            config.aggregateViewColumns.mfr,
+            config.aggregateViewColumns.desc,
+            config.aggregateViewColumns.changeType,
+            config.aggregateViewColumns.oldTotalQty,
+            config.aggregateViewColumns.newTotalQty,
+            config.aggregateViewColumns.delta,
+          ],
+        ];
+
+        compareState.aggregateComparison.forEach((item) => {
+          aggData.push([
+            item.sku,
+            item.partNum,
+            item.mfr,
+            item.desc,
+            item.changeType,
+            item.oldTotalQty === null ? "-" : item.oldTotalQty,
+            item.newTotalQty,
+            item.delta === null ? "-" : item.delta,
+          ]);
+        });
+
+        const wsAgg = XLSX.utils.aoa_to_sheet(aggData);
+
+        // Apply colors to aggregate sheet
+        compareState.aggregateComparison.forEach((item, idx) => {
+          const fillColor =
+            item.changeType === "Added"
+              ? "D4EDDA"
+              : item.changeType === "Removed"
+              ? "F8D7DA"
+              : "FFF3CD";
+
+          for (let col = 0; col < 7; col++) {
+            const cellRef = XLSX.utils.encode_cell({ r: idx + 1, c: col });
+            if (!wsAgg[cellRef]) wsAgg[cellRef] = { t: "s", v: "" };
+            wsAgg[cellRef].s = { fill: { fgColor: { rgb: fillColor } } };
+          }
+        });
+
+        wsAgg["!cols"] = [
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 30 },
+          { wch: 15 },
+          { wch: 10 },
+          { wch: 10 },
+          { wch: 10 },
+        ];
+
+        XLSX.utils.book_append_sheet(wb, wsAgg, "Aggregate Comparison");
+
+        // Sheet 3: Comparison Summary
+        const now = new Date();
+
+        // Calculate statistics for Section View
+        let sectionAddedCount = 0,
+          sectionRemovedCount = 0,
+          sectionChangedCount = 0;
+        compareState.sectionComparison.forEach((section) => {
+          section.items.forEach((item) => {
+            if (item.changeType === "Added") sectionAddedCount++;
+            else if (item.changeType === "Removed") sectionRemovedCount++;
+            else if (item.changeType === "Quantity") sectionChangedCount++;
+          });
+        });
+
+        // Calculate statistics for Aggregate View
+        let aggAddedCount = 0,
+          aggRemovedCount = 0,
+          aggChangedCount = 0;
+        compareState.aggregateComparison.forEach((item) => {
+          if (item.changeType === "Added") aggAddedCount++;
+          else if (item.changeType === "Removed") aggRemovedCount++;
+          else if (item.changeType === "Quantity") aggChangedCount++;
+        });
+
+        const summaryData = [
+          ["COMPARISON SUMMARY"],
+          [],
+          [`Generated: ${now.toUTCString()}`],
+          [`Old BOM File: ${compareState.oldBomFile.name}`],
+          [`New BOM File: ${compareState.newBomFile.name}`],
+          [],
+          ["Changes (Section View):"],
+          [`  Line items added: ${sectionAddedCount}`],
+          [`  Line items removed: ${sectionRemovedCount}`],
+          [`  Line items with changed quantity: ${sectionChangedCount}`],
+          [],
+          ["Changes (Aggregate View):"],
+          [`  Line items added: ${aggAddedCount}`],
+          [`  Line items removed: ${aggRemovedCount}`],
+          [`  Line items with changed quantity: ${aggChangedCount}`],
+        ];
+
+        const wsSum = XLSX.utils.aoa_to_sheet(summaryData);
+        wsSum["!cols"] = [{ wch: 100 }];
+
+        XLSX.utils.book_append_sheet(wb, wsSum, "Comparison Summary");
+
+        // Download
+        XLSX.writeFile(wb, "BOM Comparison.xlsx");
+      }
+
+      function exportComparisonToPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF("portrait", "mm", "a4");
+
+        const now = new Date();
+        const dateStr = now.toUTCString();
+
+        // Summary Page
+        doc.setFontSize(18);
+        doc.setFont(undefined, "bold");
+        doc.text("BOM Comparison Report", 105, 20, { align: "center" });
+
+        doc.setFontSize(11);
+        doc.setFont(undefined, "normal");
+        doc.text(`Generated: ${dateStr}`, 105, 30, { align: "center" });
+
+        doc.setFontSize(12);
+        doc.setFont(undefined, "bold");
+        doc.text("File Information:", 20, 45);
+
+        doc.setFontSize(10);
+        doc.setFont(undefined, "normal");
+        doc.text(`Old BOM: ${compareState.oldBomFile.name}`, 20, 55);
+        doc.text(`New BOM: ${compareState.newBomFile.name}`, 20, 62);
+
+        // Calculate statistics for both views
+        // Section View Statistics
+        let sectionAddedCount = 0,
+          sectionRemovedCount = 0,
+          sectionChangedCount = 0;
+        compareState.sectionComparison.forEach((section) => {
+          section.items.forEach((item) => {
+            if (item.changeType === "Added") sectionAddedCount++;
+            else if (item.changeType === "Removed") sectionRemovedCount++;
+            else if (item.changeType === "Quantity") sectionChangedCount++;
+          });
+        });
+
+        // Aggregate View Statistics
+        let aggAddedCount = 0,
+          aggRemovedCount = 0,
+          aggChangedCount = 0;
+        compareState.aggregateComparison.forEach((item) => {
+          if (item.changeType === "Added") aggAddedCount++;
+          else if (item.changeType === "Removed") aggRemovedCount++;
+          else if (item.changeType === "Quantity") aggChangedCount++;
+        });
+
+        doc.setFontSize(12);
+        doc.setFont(undefined, "bold");
+        doc.text("Summary (Section View):", 20, 75);
+
+        doc.setFontSize(10);
+        doc.setFont(undefined, "normal");
+        doc.setTextColor(40, 167, 69); // Green
+        doc.text(`Line items added: ${sectionAddedCount}`, 20, 85);
+        doc.setTextColor(220, 53, 69); // Red
+        doc.text(`Line items removed: ${sectionRemovedCount}`, 20, 92);
+        doc.setTextColor(255, 193, 7); // Yellow
+        doc.text(
+          `Line items with changed quantity: ${sectionChangedCount}`,
+          20,
+          99
+        );
+        doc.setTextColor(0, 0, 0); // Reset to black
+
+        doc.setFontSize(12);
+        doc.setFont(undefined, "bold");
+        doc.text("Summary (Aggregate View):", 20, 112);
+
+        doc.setFontSize(10);
+        doc.setFont(undefined, "normal");
+        doc.setTextColor(40, 167, 69); // Green
+        doc.text(`Line items added: ${aggAddedCount}`, 20, 122);
+        doc.setTextColor(220, 53, 69); // Red
+        doc.text(`Line items removed: ${aggRemovedCount}`, 20, 129);
+        doc.setTextColor(255, 193, 7); // Yellow
+        doc.text(
+          `Line items with changed quantity: ${aggChangedCount}`,
+          20,
+          136
+        );
+        doc.setTextColor(0, 0, 0); // Reset to black
+
+        // Section Comparison
+        doc.addPage();
+        doc.setFontSize(14);
+        doc.setFont(undefined, "bold");
+        doc.text("Section Comparison", 105, 15, { align: "center" });
+
+        let yPosition = 25;
+
+        compareState.sectionComparison.forEach((section, sectionIdx) => {
+          // Check if we need a new page for the section header
+          if (yPosition > 270) {
+            doc.addPage();
+            yPosition = 15;
+          }
+
+          // Section Header
+          doc.setFontSize(11);
+          doc.setFont(undefined, "bold");
+          doc.setFillColor(233, 236, 239);
+          doc.rect(10, yPosition - 5, 190, 8, "F");
+          doc.text(section.sectionName, 15, yPosition);
+          yPosition += 10;
+
+          // Prepare table data
+          const tableData = section.items.map((item) => [
+            item.sku,
+            item.partNum,
+            item.mfr,
+            item.desc,
+            item.changeType,
+            item.oldQty === null ? "-" : item.oldQty.toString(),
+            item.newQty.toString(),
+            item.delta === null
+              ? "-"
+              : (item.delta > 0 ? "+" : "") + item.delta.toString(),
+          ]);
+
+          doc.autoTable({
+            startY: yPosition,
+            head: [
+              [
+                config.sectionViewColumns.sku,
+                config.sectionViewColumns.partNum,
+                config.sectionViewColumns.mfr,
+                config.sectionViewColumns.desc,
+                config.sectionViewColumns.changeType,
+                config.sectionViewColumns.oldQty,
+                config.sectionViewColumns.newQty,
+                config.sectionViewColumns.delta,
+              ],
+            ],
+            body: tableData,
+            theme: "grid",
+            headStyles: {
+              fillColor: [102, 126, 234],
+              textColor: 255,
+              fontStyle: "bold",
+              fontSize: 8,
+            },
+            bodyStyles: {
+              fontSize: 7,
+            },
+            columnStyles: {
+              0: { cellWidth: 20 },
+              1: { cellWidth: 25 },
+              2: { cellWidth: 25 },
+              3: { cellWidth: 50 },
+              4: { cellWidth: 18 },
+              5: { cellWidth: 12 },
+              6: { cellWidth: 12 },
+              7: { cellWidth: 12 },
+            },
+            didParseCell: function (data) {
+              if (data.row.section === "body") {
+                const item = section.items[data.row.index];
+                if (item.changeType === "Added") {
+                  data.cell.styles.fillColor = [212, 237, 218];
+                } else if (item.changeType === "Removed") {
+                  data.cell.styles.fillColor = [248, 215, 218];
+                } else if (item.changeType === "Quantity") {
+                  data.cell.styles.fillColor = [255, 243, 205];
                 }
+              }
+            },
+            margin: { left: 10, right: 10 },
+          });
+
+          yPosition = doc.lastAutoTable.finalY + 15;
+        });
+
+        // Aggregate Comparison
+        doc.addPage();
+        doc.setFontSize(14);
+        doc.setFont(undefined, "bold");
+        doc.text("Aggregate Comparison", 105, 15, { align: "center" });
+
+        const aggTableData = compareState.aggregateComparison.map((item) => [
+          item.sku,
+          item.partNum,
+          item.mfr,
+          item.desc,
+          item.changeType,
+          item.oldTotalQty === null ? "-" : item.oldTotalQty.toString(),
+          item.newTotalQty.toString(),
+          item.delta === null
+            ? "-"
+            : (item.delta > 0 ? "+" : "") + item.delta.toString(),
+        ]);
+
+        doc.autoTable({
+          startY: 25,
+          head: [
+            [
+              config.aggregateViewColumns.sku,
+              config.aggregateViewColumns.partNum,
+              config.aggregateViewColumns.mfr,
+              config.aggregateViewColumns.desc,
+              config.aggregateViewColumns.changeType,
+              config.aggregateViewColumns.oldTotalQty,
+              config.aggregateViewColumns.newTotalQty,
+              config.aggregateViewColumns.delta,
+            ],
+          ],
+          body: aggTableData,
+          theme: "grid",
+          headStyles: {
+            fillColor: [102, 126, 234],
+            textColor: 255,
+            fontStyle: "bold",
+            fontSize: 8,
+          },
+          bodyStyles: {
+            fontSize: 7,
+          },
+          columnStyles: {
+            0: { cellWidth: 20 },
+            1: { cellWidth: 25 },
+            2: { cellWidth: 25 },
+            3: { cellWidth: 50 },
+            4: { cellWidth: 18 },
+            5: { cellWidth: 12 },
+            6: { cellWidth: 12 },
+            7: { cellWidth: 12 },
+          },
+          didParseCell: function (data) {
+            if (data.row.section === "body") {
+              const item = compareState.aggregateComparison[data.row.index];
+              if (item.changeType === "Added") {
+                data.cell.styles.fillColor = [212, 237, 218];
+              } else if (item.changeType === "Removed") {
+                data.cell.styles.fillColor = [248, 215, 218];
+              } else if (item.changeType === "Quantity") {
+                data.cell.styles.fillColor = [255, 243, 205];
+              }
             }
-            ws['!cols'] = colWidths;
+          },
+          margin: { left: 10, right: 10 },
+        });
 
-            // Merge cells for title
-            ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }];
+        // Save the PDF
+        doc.save("BOM Comparison.pdf");
+      }
 
-            XLSX.utils.book_append_sheet(wb, ws, 'Bill of Material');
+      // ==================== Shared Excel Reading ====================
 
-            // Sheet 2: Consolidation Summary
-            const now = new Date();
-            const dateStr = now.toUTCString();
-            
-            const summaryData = [
-                ['CONSOLIDATION SUMMARY'],
-                [],
-                [`Generated: ${dateStr}`],
-                [],
-                ['File Name', 'Multiplier']
-            ];
+      function readExcelFile(file, config, multiplier) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
 
-            // Add file information
-            for (let info of fileInfos) {
-                summaryData.push([info.name, info.multiplier]);
-            }
+          reader.onload = (e) => {
+            try {
+              const data = new Uint8Array(e.target.result);
+              const workbook = XLSX.read(data, { type: "array" });
 
-            // Add warnings/errors if any
-            if (warnings.length > 0) {
-                summaryData.push([]);
-                summaryData.push(['Warnings and Errors']);
-                for (let warning of warnings) {
-                    summaryData.push([warning]);
+              if (workbook.SheetNames.length === 0) {
+                reject(new Error(`No sheets found`));
+                return;
+              }
+
+              const sheet = workbook.Sheets[workbook.SheetNames[0]];
+              const rows = XLSX.utils.sheet_to_json(sheet, {
+                header: 1,
+                defval: "",
+              });
+
+              if (rows.length === 0) {
+                reject(new Error(`Empty file`));
+                return;
+              }
+
+              let headerRowIdx = -1;
+              let colMap = {};
+
+              for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const normalized = row.map((h) =>
+                  (h || "").toString().trim().toUpperCase()
+                );
+
+                const qtyIdx = normalized.indexOf(config.qty.toUpperCase());
+                const skuIdx = normalized.indexOf(config.sku.toUpperCase());
+                const partNumIdx = normalized.indexOf(
+                  config.partNum.toUpperCase()
+                );
+                const mfrIdx = normalized.indexOf(config.mfr.toUpperCase());
+                const descIdx = normalized.indexOf(config.desc.toUpperCase());
+
+                if (qtyIdx !== -1 && partNumIdx !== -1) {
+                  headerRowIdx = i;
+                  colMap = { qtyIdx, skuIdx, partNumIdx, mfrIdx, descIdx };
+                  break;
                 }
+              }
+
+              if (headerRowIdx === -1) {
+                reject(new Error(`Required columns not found`));
+                return;
+              }
+
+              const extractedData = [];
+              for (let i = headerRowIdx + 1; i < rows.length; i++) {
+                const row = rows[i];
+
+                const qty = row[colMap.qtyIdx];
+                const partNum = (row[colMap.partNumIdx] || "")
+                  .toString()
+                  .trim();
+
+                if (!partNum || qty === undefined || qty === null || qty === "")
+                  continue;
+
+                const qtyNum = parseFloat(qty);
+                if (isNaN(qtyNum)) continue;
+
+                extractedData.push({
+                  qty: qtyNum * multiplier,
+                  sku:
+                    colMap.skuIdx !== -1
+                      ? (row[colMap.skuIdx] || "").toString().trim()
+                      : "",
+                  partNum: partNum,
+                  mfr:
+                    colMap.mfrIdx !== -1
+                      ? (row[colMap.mfrIdx] || "").toString().trim()
+                      : "",
+                  desc:
+                    colMap.descIdx !== -1
+                      ? (row[colMap.descIdx] || "").toString().trim()
+                      : "",
+                });
+              }
+
+              if (extractedData.length === 0) {
+                reject(new Error(`No valid data rows found`));
+                return;
+              }
+
+              resolve(extractedData);
+            } catch (err) {
+              reject(new Error(`Error processing file: ${err.message}`));
             }
+          };
 
-            const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-
-            // Auto-fit columns for summary sheet
-            const summaryColWidths = [
-                { wch: 50 }, // File Name
-                { wch: 12 }  // Multiplier
-            ];
-            wsSummary['!cols'] = summaryColWidths;
-
-            XLSX.utils.book_append_sheet(wb, wsSummary, 'Consolidation Summary');
-
-            // Download file
-            XLSX.writeFile(wb, filename);
-        }
+          reader.onerror = () => reject(new Error(`Failed to read file`));
+          reader.readAsArrayBuffer(file);
+        });
+      }
     </script>
-</body>
+  </body>
 </html>
