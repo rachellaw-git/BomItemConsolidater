@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Consolidate multiple BOM Excel files or compare two BOM versions"
+      content="Consolidate multiple BOM files 
+        Compare two BOM versions
+        Get an Excel script to format BOMs for CAD"
     />
-    <title>BOM Tool - Consolidate & Compare</title>
+    <title>BOM Helper - Consolidate, Compare & Format</title>
 
     <!-- SheetJS Library for Excel Processing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -497,13 +499,37 @@
       .export-btn.pdf:hover {
         background: #c82333;
       }
+
+      /* Footer */
+      .footer {
+        max-width: 1200px;
+        margin: 20px auto 0;
+        padding: 20px;
+        text-align: center;
+        color: white;
+        font-size: 13px;
+      }
+
+      .footer a {
+        color: white;
+        text-decoration: none;
+        font-weight: 600;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+        transition: border-color 0.3s ease;
+      }
+
+      .footer a:hover {
+        border-bottom-color: white;
+      }
     </style>
   </head>
   <body>
     <div class="container">
-      <h1>BOM Tool</h1>
+      <h1>BOM Helper</h1>
       <p class="subtitle">
-        Consolidate multiple BOM files or compare two BOM versions
+        Consolidate multiple BOM files <br />
+        Compare two BOM versions<br />
+        Get an Excel script to format BOMs for CAD
       </p>
 
       <!-- Tool Toggle -->
@@ -512,6 +538,9 @@
           Consolidate BOMs
         </button>
         <button class="tool-tab" data-tool="compare">Compare BOMs</button>
+        <button class="tool-tab" data-tool="formatter">
+          BOM CAD Formatter
+        </button>
       </div>
 
       <!-- Consolidate Tool -->
@@ -613,6 +642,49 @@
         </div>
 
         <div class="error" id="compareError"></div>
+      </div>
+
+      <!-- BOM CAD Formatter Tool -->
+      <div class="tool-content" id="formatter-content">
+        <div style="text-align: center; padding: 40px 20px">
+          <div style="font-size: 48px; margin-bottom: 20px">📋</div>
+          <h2 style="color: #333; margin-bottom: 15px">BOM CAD Formatter</h2>
+          <p
+            style="
+              color: #666;
+              font-size: 16px;
+              margin-bottom: 25px;
+              line-height: 1.6;
+            "
+          >
+            A VBA macro to format Excel Bill of Materials (BOM) spreadsheets<br />
+            and creates a CAD-ready copy with standardized formatting.
+          </p>
+          <a
+            href="https://github.com/rachellaw-git/ExcelBOMFormatter"
+            target="_blank"
+            rel="noopener noreferrer"
+            style="
+              display: inline-block;
+              padding: 15px 30px;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              text-decoration: none;
+              border-radius: 8px;
+              font-weight: 600;
+              font-size: 16px;
+              transition: transform 0.2s ease;
+            "
+            onmouseover="this.style.transform='translateY(-2px)'"
+            onmouseout="this.style.transform='translateY(0)'"
+          >
+            Visit GitHub Repository
+          </a>
+          <p style="color: #999; font-size: 14px; margin-top: 20px">
+            Click on <strong>Releases</strong> in the repository to download the
+            latest version
+          </p>
+        </div>
       </div>
     </div>
 
@@ -1938,9 +2010,9 @@
             },
             columnStyles: {
               0: { cellWidth: 20 },
-              1: { cellWidth: 25 },
+              1: { cellWidth: 35 },
               2: { cellWidth: 25 },
-              3: { cellWidth: 50 },
+              3: { cellWidth: 55 },
               4: { cellWidth: 18 },
               5: { cellWidth: 12 },
               6: { cellWidth: 12 },
@@ -2010,9 +2082,9 @@
           },
           columnStyles: {
             0: { cellWidth: 20 },
-            1: { cellWidth: 25 },
+            1: { cellWidth: 35 },
             2: { cellWidth: 25 },
-            3: { cellWidth: 50 },
+            3: { cellWidth: 55 },
             4: { cellWidth: 18 },
             5: { cellWidth: 12 },
             6: { cellWidth: 12 },
@@ -2142,5 +2214,19 @@
         });
       }
     </script>
+
+    <footer class="footer">
+      <p>
+        For more information or to check for updates, visit
+        <a
+          href="https://github.com/rachellaw-git/BomHelper"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          github.com/rachellaw-git/BomHelper
+        </a>
+        — Click <strong>Releases</strong> to download the latest version
+      </p>
+    </footer>
   </body>
 </html>
