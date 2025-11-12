@@ -1374,12 +1374,18 @@
       function performSectionComparison(oldSections, newSections) {
         const results = [];
 
-        // Create maps for quick lookup
+        // Create maps for quick lookup - aggregate duplicates within sections
         const oldMap = new Map();
         oldSections.forEach((section) => {
           section.items.forEach((item) => {
             const key = `${section.name}|||${item.partNum}`;
-            oldMap.set(key, item);
+            if (oldMap.has(key)) {
+              // Add to existing quantity
+              const existing = oldMap.get(key);
+              existing.qty += item.qty;
+            } else {
+              oldMap.set(key, { ...item });
+            }
           });
         });
 
@@ -1387,19 +1393,51 @@
         newSections.forEach((section) => {
           section.items.forEach((item) => {
             const key = `${section.name}|||${item.partNum}`;
-            newMap.set(key, item);
+            if (newMap.has(key)) {
+              // Add to existing quantity
+              const existing = newMap.get(key);
+              existing.qty += item.qty;
+            } else {
+              newMap.set(key, { ...item });
+            }
           });
         });
 
-        // Process by section from new BOM
-        newSections.forEach((section) => {
+        // Get all unique section names from both old and new BOMs
+        const allSectionNames = new Set();
+        newSections.forEach((section) => allSectionNames.add(section.name));
+        oldSections.forEach((section) => allSectionNames.add(section.name));
+
+        // Process each section using aggregated data from maps
+        allSectionNames.forEach((sectionName) => {
           const sectionResults = {
-            sectionName: section.name,
+            sectionName: sectionName,
             items: [],
           };
 
-          section.items.forEach((newItem) => {
-            const key = `${section.name}|||${newItem.partNum}`;
+          // Get all unique part numbers in this section from both maps
+          const partNumsInSection = new Set();
+
+          // Extract part numbers from newMap for this section
+          newMap.forEach((item, key) => {
+            const [section, partNum] = key.split("|||");
+            if (section === sectionName) {
+              partNumsInSection.add(partNum);
+            }
+          });
+
+          // Extract part numbers from oldMap for this section
+          oldMap.forEach((item, key) => {
+            const [section, partNum] = key.split("|||");
+            if (section === sectionName) {
+              partNumsInSection.add(partNum);
+            }
+          });
+
+          // Process each unique part number in this section
+          partNumsInSection.forEach((partNum) => {
+            const key = `${sectionName}|||${partNum}`;
+            const newItem = newMap.get(key);
             const oldItem = oldMap.get(key);
 
             if (!oldItem || oldItem.qty === 0) {
@@ -1413,6 +1451,18 @@
                 oldQty: 0,
                 newQty: newItem.qty,
                 delta: newItem.qty,
+              });
+            } else if (!newItem || newItem.qty === 0) {
+              // Removed
+              sectionResults.items.push({
+                changeType: "Removed",
+                sku: oldItem.sku,
+                partNum: oldItem.partNum,
+                mfr: oldItem.mfr,
+                desc: oldItem.desc,
+                oldQty: oldItem.qty,
+                newQty: 0,
+                delta: -oldItem.qty,
               });
             } else if (oldItem.qty !== newItem.qty) {
               // Quantity changed
@@ -1428,29 +1478,6 @@
               });
             }
           });
-
-          // Check for removed items in this section
-          const oldSection = oldSections.find((s) => s.name === section.name);
-          if (oldSection) {
-            oldSection.items.forEach((oldItem) => {
-              const key = `${section.name}|||${oldItem.partNum}`;
-              const newItem = newMap.get(key);
-
-              if (!newItem || newItem.qty === 0) {
-                // Removed
-                sectionResults.items.push({
-                  changeType: "Removed",
-                  sku: oldItem.sku,
-                  partNum: oldItem.partNum,
-                  mfr: oldItem.mfr,
-                  desc: oldItem.desc,
-                  oldQty: oldItem.qty,
-                  newQty: 0,
-                  delta: -oldItem.qty,
-                });
-              }
-            });
-          }
 
           if (sectionResults.items.length > 0) {
             results.push(sectionResults);
@@ -2225,7 +2252,7 @@
         >
           github.com/rachellaw-git/BomHelper
         </a>
-        — Click <strong>Releases</strong> to download the latest version
+        – Click <strong>Releases</strong> to download the latest version
       </p>
     </footer>
   </body>
