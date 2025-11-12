@@ -14,6 +14,9 @@
     <!-- SheetJS Library for Excel Processing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
+    <!-- ExcelJS for Excel Export with Styling -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+
     <!-- jsPDF and jsPDF-AutoTable for PDF Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -1374,12 +1377,18 @@
       function performSectionComparison(oldSections, newSections) {
         const results = [];
 
-        // Create maps for quick lookup
+        // Create maps for quick lookup - aggregate duplicates within sections
         const oldMap = new Map();
         oldSections.forEach((section) => {
           section.items.forEach((item) => {
             const key = `${section.name}|||${item.partNum}`;
-            oldMap.set(key, item);
+            if (oldMap.has(key)) {
+              // Add to existing quantity
+              const existing = oldMap.get(key);
+              existing.qty += item.qty;
+            } else {
+              oldMap.set(key, { ...item });
+            }
           });
         });
 
@@ -1387,19 +1396,51 @@
         newSections.forEach((section) => {
           section.items.forEach((item) => {
             const key = `${section.name}|||${item.partNum}`;
-            newMap.set(key, item);
+            if (newMap.has(key)) {
+              // Add to existing quantity
+              const existing = newMap.get(key);
+              existing.qty += item.qty;
+            } else {
+              newMap.set(key, { ...item });
+            }
           });
         });
 
-        // Process by section from new BOM
-        newSections.forEach((section) => {
+        // Get all unique section names from both old and new BOMs
+        const allSectionNames = new Set();
+        newSections.forEach((section) => allSectionNames.add(section.name));
+        oldSections.forEach((section) => allSectionNames.add(section.name));
+
+        // Process each section using aggregated data from maps
+        allSectionNames.forEach((sectionName) => {
           const sectionResults = {
-            sectionName: section.name,
+            sectionName: sectionName,
             items: [],
           };
 
-          section.items.forEach((newItem) => {
-            const key = `${section.name}|||${newItem.partNum}`;
+          // Get all unique part numbers in this section from both maps
+          const partNumsInSection = new Set();
+
+          // Extract part numbers from newMap for this section
+          newMap.forEach((item, key) => {
+            const [section, partNum] = key.split("|||");
+            if (section === sectionName) {
+              partNumsInSection.add(partNum);
+            }
+          });
+
+          // Extract part numbers from oldMap for this section
+          oldMap.forEach((item, key) => {
+            const [section, partNum] = key.split("|||");
+            if (section === sectionName) {
+              partNumsInSection.add(partNum);
+            }
+          });
+
+          // Process each unique part number in this section
+          partNumsInSection.forEach((partNum) => {
+            const key = `${sectionName}|||${partNum}`;
+            const newItem = newMap.get(key);
             const oldItem = oldMap.get(key);
 
             if (!oldItem || oldItem.qty === 0) {
@@ -1413,6 +1454,18 @@
                 oldQty: 0,
                 newQty: newItem.qty,
                 delta: newItem.qty,
+              });
+            } else if (!newItem || newItem.qty === 0) {
+              // Removed
+              sectionResults.items.push({
+                changeType: "Removed",
+                sku: oldItem.sku,
+                partNum: oldItem.partNum,
+                mfr: oldItem.mfr,
+                desc: oldItem.desc,
+                oldQty: oldItem.qty,
+                newQty: 0,
+                delta: -oldItem.qty,
               });
             } else if (oldItem.qty !== newItem.qty) {
               // Quantity changed
@@ -1429,32 +1482,8 @@
             }
           });
 
-          // Check for removed items in this section
-          const oldSection = oldSections.find((s) => s.name === section.name);
-          if (oldSection) {
-            oldSection.items.forEach((oldItem) => {
-              const key = `${section.name}|||${oldItem.partNum}`;
-              const newItem = newMap.get(key);
-
-              if (!newItem || newItem.qty === 0) {
-                // Removed
-                sectionResults.items.push({
-                  changeType: "Removed",
-                  sku: oldItem.sku,
-                  partNum: oldItem.partNum,
-                  mfr: oldItem.mfr,
-                  desc: oldItem.desc,
-                  oldQty: oldItem.qty,
-                  newQty: 0,
-                  delta: -oldItem.qty,
-                });
-              }
-            });
-          }
-
-          if (sectionResults.items.length > 0) {
-            results.push(sectionResults);
-          }
+          // Always push section results, even if no changes
+          results.push(sectionResults);
         });
 
         return results;
@@ -1575,29 +1604,39 @@
                     </tr>
                 `;
 
-          section.items.forEach((item) => {
-            const rowClass =
-              item.changeType === "Added"
-                ? "row-added"
-                : item.changeType === "Removed"
-                ? "row-removed"
-                : "row-changed";
-            const badgeClass =
-              item.changeType === "Added"
-                ? "badge-added"
-                : item.changeType === "Removed"
-                ? "badge-removed"
-                : "badge-changed";
-
+          if (section.items.length === 0) {
+            // No changes in this section
             html += `
+                        <tr>
+                            <td colspan="8" style="text-align: center; color: #28a745; padding: 20px; font-style: italic;">
+                                No changes in this section
+                            </td>
+                        </tr>
+                    `;
+          } else {
+            section.items.forEach((item) => {
+              const rowClass =
+                item.changeType === "Added"
+                  ? "row-added"
+                  : item.changeType === "Removed"
+                  ? "row-removed"
+                  : "row-changed";
+              const badgeClass =
+                item.changeType === "Added"
+                  ? "badge-added"
+                  : item.changeType === "Removed"
+                  ? "badge-removed"
+                  : "badge-changed";
+
+              html += `
                         <tr class="${rowClass}">
                             <td>${item.sku}</td>
                             <td>${item.partNum}</td>
                             <td>${item.mfr}</td>
                             <td>${item.desc}</td>
                             <td><span class="change-badge ${badgeClass}">${
-              item.changeType
-            }</span></td>
+                item.changeType
+              }</span></td>
                             <td>${item.oldQty === null ? "-" : item.oldQty}</td>
                             <td>${item.newQty}</td>
                             <td>${
@@ -1607,7 +1646,8 @@
                             }</td>
                         </tr>
                     `;
-          });
+            });
+          }
         });
 
         html += "</tbody>";
@@ -1674,16 +1714,33 @@
       }
 
       function exportComparisonToExcel() {
-        const wb = XLSX.utils.book_new();
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = "BOM Helper";
+        workbook.created = new Date();
 
         // Sheet 1: Section Comparison
-        const sectionData = [];
-        compareState.sectionComparison.forEach((section) => {
-          // Section row
-          sectionData.push([section.sectionName]);
+        const sectionSheet = workbook.addWorksheet("Section Comparison");
+        const sectionColCount = 8; // Number of columns in section view
 
-          // Header row
-          sectionData.push([
+        compareState.sectionComparison.forEach((section, sectionIdx) => {
+          // Section header row
+          const sectionRow = sectionSheet.addRow([section.sectionName]);
+          sectionRow.font = { bold: true, size: 12 };
+          // Only apply fill to the first cell, then merge
+          sectionRow.getCell(1).fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FFE9ECEF" },
+          };
+          sectionSheet.mergeCells(
+            sectionRow.number,
+            1,
+            sectionRow.number,
+            sectionColCount
+          );
+
+          // Column headers
+          const headerRow = sectionSheet.addRow([
             config.sectionViewColumns.sku,
             config.sectionViewColumns.partNum,
             config.sectionViewColumns.mfr,
@@ -1693,81 +1750,116 @@
             config.sectionViewColumns.newQty,
             config.sectionViewColumns.delta,
           ]);
+          headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+          headerRow.alignment = { vertical: "middle", horizontal: "center" };
+          // Apply fill only to cells with data
+          for (let i = 1; i <= sectionColCount; i++) {
+            headerRow.getCell(i).fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: "FF667EEA" },
+            };
+          }
 
-          // Items
-          section.items.forEach((item) => {
-            sectionData.push([
-              item.sku,
-              item.partNum,
-              item.mfr,
-              item.desc,
-              item.changeType,
-              item.oldQty === null ? "-" : item.oldQty,
-              item.newQty,
-              item.delta === null ? "-" : item.delta,
+          if (section.items.length === 0) {
+            // No changes row
+            const noChangeRow = sectionSheet.addRow([
+              "No changes in this section",
             ]);
-          });
+            noChangeRow.font = { italic: true, color: { argb: "FF155724" } };
+            noChangeRow.getCell(1).fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: "FFD4EDDA" },
+            };
+            noChangeRow.alignment = {
+              vertical: "middle",
+              horizontal: "center",
+            };
+            sectionSheet.mergeCells(
+              noChangeRow.number,
+              1,
+              noChangeRow.number,
+              sectionColCount
+            );
+          } else {
+            // Data rows
+            section.items.forEach((item) => {
+              const row = sectionSheet.addRow([
+                item.sku,
+                item.partNum,
+                item.mfr,
+                item.desc,
+                item.changeType,
+                item.oldQty === null ? "-" : item.oldQty,
+                item.newQty,
+                item.delta === null ? "-" : item.delta,
+              ]);
 
-          // Empty row between sections
-          sectionData.push([]);
+              // Apply color based on change type
+              const fillColor =
+                item.changeType === "Added"
+                  ? "FFD4EDDA"
+                  : item.changeType === "Removed"
+                  ? "FFF8D7DA"
+                  : "FFFFF3CD";
+
+              // Apply fill only to cells with actual data (columns 1-8)
+              for (let i = 1; i <= sectionColCount; i++) {
+                row.getCell(i).fill = {
+                  type: "pattern",
+                  pattern: "solid",
+                  fgColor: { argb: fillColor },
+                };
+              }
+            });
+          }
+
+          // Add empty row between sections
+          sectionSheet.addRow([]);
         });
 
-        const wsSec = XLSX.utils.aoa_to_sheet(sectionData);
-
-        // Apply colors to section sheet
-        let rowIdx = 0;
-        compareState.sectionComparison.forEach((section) => {
-          // Skip section row and header
-          rowIdx += 2;
-
-          section.items.forEach((item) => {
-            const fillColor =
-              item.changeType === "Added"
-                ? "D4EDDA"
-                : item.changeType === "Removed"
-                ? "F8D7DA"
-                : "FFF3CD";
-
-            for (let col = 0; col < 8; col++) {
-              const cellRef = XLSX.utils.encode_cell({ r: rowIdx, c: col });
-              if (!wsSec[cellRef]) wsSec[cellRef] = { t: "s", v: "" };
-              wsSec[cellRef].s = { fill: { fgColor: { rgb: fillColor } } };
-            }
-            rowIdx++;
-          });
-
-          rowIdx++; // Empty row
-        });
-
-        wsSec["!cols"] = [
-          { wch: 15 },
-          { wch: 15 },
-          { wch: 15 },
-          { wch: 30 },
-          { wch: 15 },
-          { wch: 10 },
-          { wch: 10 },
-          { wch: 10 },
+        // Set column widths
+        sectionSheet.columns = [
+          { width: 15 },
+          { width: 20 },
+          { width: 20 },
+          { width: 40 },
+          { width: 15 },
+          { width: 12 },
+          { width: 12 },
+          { width: 12 },
         ];
-
-        XLSX.utils.book_append_sheet(wb, wsSec, "Section Comparison");
 
         // Sheet 2: Aggregate Comparison
-        const aggData = [
-          [
-            config.aggregateViewColumns.sku,
-            config.aggregateViewColumns.partNum,
-            config.aggregateViewColumns.mfr,
-            config.aggregateViewColumns.desc,
-            config.aggregateViewColumns.changeType,
-            config.aggregateViewColumns.oldTotalQty,
-            config.aggregateViewColumns.newTotalQty,
-            config.aggregateViewColumns.delta,
-          ],
-        ];
+        const aggSheet = workbook.addWorksheet("Aggregate Comparison");
+        const aggColCount = 8; // Number of columns in aggregate view
 
+        // Header row
+        const aggHeaderRow = aggSheet.addRow([
+          config.aggregateViewColumns.sku,
+          config.aggregateViewColumns.partNum,
+          config.aggregateViewColumns.mfr,
+          config.aggregateViewColumns.desc,
+          config.aggregateViewColumns.changeType,
+          config.aggregateViewColumns.oldTotalQty,
+          config.aggregateViewColumns.newTotalQty,
+          config.aggregateViewColumns.delta,
+        ]);
+        aggHeaderRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        aggHeaderRow.alignment = { vertical: "middle", horizontal: "center" };
+        // Apply fill only to cells with data
+        for (let i = 1; i <= aggColCount; i++) {
+          aggHeaderRow.getCell(i).fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FF667EEA" },
+          };
+        }
+
+        // Data rows
         compareState.aggregateComparison.forEach((item) => {
-          aggData.push([
+          const row = aggSheet.addRow([
             item.sku,
             item.partNum,
             item.mfr,
@@ -1777,43 +1869,41 @@
             item.newTotalQty,
             item.delta === null ? "-" : item.delta,
           ]);
-        });
 
-        const wsAgg = XLSX.utils.aoa_to_sheet(aggData);
-
-        // Apply colors to aggregate sheet
-        compareState.aggregateComparison.forEach((item, idx) => {
           const fillColor =
             item.changeType === "Added"
-              ? "D4EDDA"
+              ? "FFD4EDDA"
               : item.changeType === "Removed"
-              ? "F8D7DA"
-              : "FFF3CD";
+              ? "FFF8D7DA"
+              : "FFFFF3CD";
 
-          for (let col = 0; col < 7; col++) {
-            const cellRef = XLSX.utils.encode_cell({ r: idx + 1, c: col });
-            if (!wsAgg[cellRef]) wsAgg[cellRef] = { t: "s", v: "" };
-            wsAgg[cellRef].s = { fill: { fgColor: { rgb: fillColor } } };
+          // Apply fill only to cells with actual data (columns 1-8)
+          for (let i = 1; i <= aggColCount; i++) {
+            row.getCell(i).fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: fillColor },
+            };
           }
         });
 
-        wsAgg["!cols"] = [
-          { wch: 15 },
-          { wch: 15 },
-          { wch: 15 },
-          { wch: 30 },
-          { wch: 15 },
-          { wch: 10 },
-          { wch: 10 },
-          { wch: 10 },
+        // Set column widths
+        aggSheet.columns = [
+          { width: 15 },
+          { width: 20 },
+          { width: 20 },
+          { width: 40 },
+          { width: 15 },
+          { width: 12 },
+          { width: 12 },
+          { width: 12 },
         ];
 
-        XLSX.utils.book_append_sheet(wb, wsAgg, "Aggregate Comparison");
-
         // Sheet 3: Comparison Summary
+        const summarySheet = workbook.addWorksheet("Comparison Summary");
         const now = new Date();
 
-        // Calculate statistics for Section View
+        // Calculate statistics
         let sectionAddedCount = 0,
           sectionRemovedCount = 0,
           sectionChangedCount = 0;
@@ -1825,7 +1915,6 @@
           });
         });
 
-        // Calculate statistics for Aggregate View
         let aggAddedCount = 0,
           aggRemovedCount = 0,
           aggChangedCount = 0;
@@ -1835,33 +1924,48 @@
           else if (item.changeType === "Quantity") aggChangedCount++;
         });
 
-        const summaryData = [
-          ["COMPARISON SUMMARY"],
-          [],
-          [`Generated: ${now.toUTCString()}`],
-          [`Old BOM File: ${compareState.oldBomFile.name}`],
-          [`New BOM File: ${compareState.newBomFile.name}`],
-          [],
-          ["Changes (Section View):"],
-          [`  Line items added: ${sectionAddedCount}`],
-          [`  Line items removed: ${sectionRemovedCount}`],
-          [`  Line items with changed quantity: ${sectionChangedCount}`],
-          [],
-          ["Changes (Aggregate View):"],
-          [`  Line items added: ${aggAddedCount}`],
-          [`  Line items removed: ${aggRemovedCount}`],
-          [`  Line items with changed quantity: ${aggChangedCount}`],
-        ];
+        const titleRow = summarySheet.addRow(["COMPARISON SUMMARY"]);
+        titleRow.font = { bold: true, size: 14 };
+        summarySheet.addRow([]);
+        summarySheet.addRow([`Generated: ${now.toUTCString()}`]);
+        summarySheet.addRow([`Old BOM File: ${compareState.oldBomFile.name}`]);
+        summarySheet.addRow([`New BOM File: ${compareState.newBomFile.name}`]);
+        summarySheet.addRow([]);
 
-        const wsSum = XLSX.utils.aoa_to_sheet(summaryData);
-        wsSum["!cols"] = [{ wch: 100 }];
+        const sectionViewTitle = summarySheet.addRow([
+          "Changes (Section View):",
+        ]);
+        sectionViewTitle.font = { bold: true };
+        summarySheet.addRow([`  Line items added: ${sectionAddedCount}`]);
+        summarySheet.addRow([`  Line items removed: ${sectionRemovedCount}`]);
+        summarySheet.addRow([
+          `  Line items with changed quantity: ${sectionChangedCount}`,
+        ]);
+        summarySheet.addRow([]);
 
-        XLSX.utils.book_append_sheet(wb, wsSum, "Comparison Summary");
+        const aggViewTitle = summarySheet.addRow(["Changes (Aggregate View):"]);
+        aggViewTitle.font = { bold: true };
+        summarySheet.addRow([`  Line items added: ${aggAddedCount}`]);
+        summarySheet.addRow([`  Line items removed: ${aggRemovedCount}`]);
+        summarySheet.addRow([
+          `  Line items with changed quantity: ${aggChangedCount}`,
+        ]);
 
-        // Download
-        XLSX.writeFile(wb, "BOM Comparison.xlsx");
+        summarySheet.columns = [{ width: 60 }];
+
+        // Export the workbook
+        workbook.xlsx.writeBuffer().then((buffer) => {
+          const blob = new Blob([buffer], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "BOM Comparison.xlsx";
+          a.click();
+          window.URL.revokeObjectURL(url);
+        });
       }
-
       function exportComparisonToPDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF("portrait", "mm", "a4");
@@ -1969,71 +2073,84 @@
           doc.text(section.sectionName, 15, yPosition);
           yPosition += 10;
 
-          // Prepare table data
-          const tableData = section.items.map((item) => [
-            item.sku,
-            item.partNum,
-            item.mfr,
-            item.desc,
-            item.changeType,
-            item.oldQty === null ? "-" : item.oldQty.toString(),
-            item.newQty.toString(),
-            item.delta === null
-              ? "-"
-              : (item.delta > 0 ? "+" : "") + item.delta.toString(),
-          ]);
+          if (section.items.length === 0) {
+            // No changes in this section
+            doc.setFontSize(10);
+            doc.setFont(undefined, "italic");
+            doc.setTextColor(40, 167, 69); // Green
+            doc.text("No changes in this section", 105, yPosition + 10, {
+              align: "center",
+            });
+            doc.setTextColor(0, 0, 0); // Reset to black
+            doc.setFont(undefined, "normal");
+            yPosition += 25;
+          } else {
+            // Prepare table data
+            const tableData = section.items.map((item) => [
+              item.sku,
+              item.partNum,
+              item.mfr,
+              item.desc,
+              item.changeType,
+              item.oldQty === null ? "-" : item.oldQty.toString(),
+              item.newQty.toString(),
+              item.delta === null
+                ? "-"
+                : (item.delta > 0 ? "+" : "") + item.delta.toString(),
+            ]);
 
-          doc.autoTable({
-            startY: yPosition,
-            head: [
-              [
-                config.sectionViewColumns.sku,
-                config.sectionViewColumns.partNum,
-                config.sectionViewColumns.mfr,
-                config.sectionViewColumns.desc,
-                config.sectionViewColumns.changeType,
-                config.sectionViewColumns.oldQty,
-                config.sectionViewColumns.newQty,
-                config.sectionViewColumns.delta,
+            doc.autoTable({
+              startY: yPosition,
+              head: [
+                [
+                  config.sectionViewColumns.sku,
+                  config.sectionViewColumns.partNum,
+                  config.sectionViewColumns.mfr,
+                  config.sectionViewColumns.desc,
+                  config.sectionViewColumns.changeType,
+                  config.sectionViewColumns.oldQty,
+                  config.sectionViewColumns.newQty,
+                  config.sectionViewColumns.delta,
+                ],
               ],
-            ],
-            body: tableData,
-            theme: "grid",
-            headStyles: {
-              fillColor: [102, 126, 234],
-              textColor: 255,
-              fontStyle: "bold",
-              fontSize: 8,
-            },
-            bodyStyles: {
-              fontSize: 7,
-            },
-            columnStyles: {
-              0: { cellWidth: 20 },
-              1: { cellWidth: 35 },
-              2: { cellWidth: 25 },
-              3: { cellWidth: 55 },
-              4: { cellWidth: 18 },
-              5: { cellWidth: 12 },
-              6: { cellWidth: 12 },
-              7: { cellWidth: 12 },
-            },
-            didParseCell: function (data) {
-              if (data.row.section === "body") {
-                const item = section.items[data.row.index];
-                if (item.changeType === "Added") {
-                  data.cell.styles.fillColor = [212, 237, 218];
-                } else if (item.changeType === "Removed") {
-                  data.cell.styles.fillColor = [248, 215, 218];
-                } else if (item.changeType === "Quantity") {
-                  data.cell.styles.fillColor = [255, 243, 205];
+              body: tableData,
+              theme: "grid",
+              headStyles: {
+                fillColor: [102, 126, 234],
+                textColor: 255,
+                fontStyle: "bold",
+                fontSize: 8,
+              },
+              bodyStyles: {
+                fontSize: 7,
+              },
+              columnStyles: {
+                0: { cellWidth: 20 },
+                1: { cellWidth: 35 },
+                2: { cellWidth: 25 },
+                3: { cellWidth: 55 },
+                4: { cellWidth: 18 },
+                5: { cellWidth: 12 },
+                6: { cellWidth: 12 },
+                7: { cellWidth: 12 },
+              },
+              didParseCell: function (data) {
+                if (data.row.section === "body") {
+                  const item = section.items[data.row.index];
+                  if (item.changeType === "Added") {
+                    data.cell.styles.fillColor = [212, 237, 218];
+                  } else if (item.changeType === "Removed") {
+                    data.cell.styles.fillColor = [248, 215, 218];
+                  } else if (item.changeType === "Quantity") {
+                    data.cell.styles.fillColor = [255, 243, 205];
+                  }
                 }
-              }
-            },
-            margin: { left: 10, right: 10 },
-          });
+              },
+              margin: { left: 10, right: 10 },
+            });
 
-          yPosition = doc.lastAutoTable.finalY + 15;
+            yPosition = doc.lastAutoTable.finalY + 15;
+          }
         });
 
         // Aggregate Comparison
@@ -2225,7 +2342,7 @@
         >
           github.com/rachellaw-git/BomHelper
         </a>
-        — Click <strong>Releases</strong> to download the latest version
+        – Click <strong>Releases</strong> to download the latest version
       </p>
     </footer>
   </body>
