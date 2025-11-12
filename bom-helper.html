@@ -1479,9 +1479,8 @@
             }
           });
 
-          if (sectionResults.items.length > 0) {
-            results.push(sectionResults);
-          }
+          // Always push section results, even if no changes
+          results.push(sectionResults);
         });
 
         return results;
@@ -1602,29 +1601,39 @@
                     </tr>
                 `;
 
-          section.items.forEach((item) => {
-            const rowClass =
-              item.changeType === "Added"
-                ? "row-added"
-                : item.changeType === "Removed"
-                ? "row-removed"
-                : "row-changed";
-            const badgeClass =
-              item.changeType === "Added"
-                ? "badge-added"
-                : item.changeType === "Removed"
-                ? "badge-removed"
-                : "badge-changed";
-
+          if (section.items.length === 0) {
+            // No changes in this section
             html += `
+                        <tr>
+                            <td colspan="8" style="text-align: center; color: #28a745; padding: 20px; font-style: italic;">
+                                No changes in this section
+                            </td>
+                        </tr>
+                    `;
+          } else {
+            section.items.forEach((item) => {
+              const rowClass =
+                item.changeType === "Added"
+                  ? "row-added"
+                  : item.changeType === "Removed"
+                  ? "row-removed"
+                  : "row-changed";
+              const badgeClass =
+                item.changeType === "Added"
+                  ? "badge-added"
+                  : item.changeType === "Removed"
+                  ? "badge-removed"
+                  : "badge-changed";
+
+              html += `
                         <tr class="${rowClass}">
                             <td>${item.sku}</td>
                             <td>${item.partNum}</td>
                             <td>${item.mfr}</td>
                             <td>${item.desc}</td>
                             <td><span class="change-badge ${badgeClass}">${
-              item.changeType
-            }</span></td>
+                item.changeType
+              }</span></td>
                             <td>${item.oldQty === null ? "-" : item.oldQty}</td>
                             <td>${item.newQty}</td>
                             <td>${
@@ -1634,7 +1643,8 @@
                             }</td>
                         </tr>
                     `;
-          });
+            });
+          }
         });
 
         html += "</tbody>";
@@ -1721,19 +1731,23 @@
             config.sectionViewColumns.delta,
           ]);
 
-          // Items
-          section.items.forEach((item) => {
-            sectionData.push([
-              item.sku,
-              item.partNum,
-              item.mfr,
-              item.desc,
-              item.changeType,
-              item.oldQty === null ? "-" : item.oldQty,
-              item.newQty,
-              item.delta === null ? "-" : item.delta,
-            ]);
-          });
+          // Items or "No changes" message
+          if (section.items.length === 0) {
+            sectionData.push(["No changes in this section"]);
+          } else {
+            section.items.forEach((item) => {
+              sectionData.push([
+                item.sku,
+                item.partNum,
+                item.mfr,
+                item.desc,
+                item.changeType,
+                item.oldQty === null ? "-" : item.oldQty,
+                item.newQty,
+                item.delta === null ? "-" : item.delta,
+              ]);
+            });
+          }
 
           // Empty row between sections
           sectionData.push([]);
@@ -1996,71 +2010,84 @@
           doc.text(section.sectionName, 15, yPosition);
           yPosition += 10;
 
-          // Prepare table data
-          const tableData = section.items.map((item) => [
-            item.sku,
-            item.partNum,
-            item.mfr,
-            item.desc,
-            item.changeType,
-            item.oldQty === null ? "-" : item.oldQty.toString(),
-            item.newQty.toString(),
-            item.delta === null
-              ? "-"
-              : (item.delta > 0 ? "+" : "") + item.delta.toString(),
-          ]);
+          if (section.items.length === 0) {
+            // No changes in this section
+            doc.setFontSize(10);
+            doc.setFont(undefined, "italic");
+            doc.setTextColor(40, 167, 69); // Green
+            doc.text("No changes in this section", 105, yPosition + 10, {
+              align: "center",
+            });
+            doc.setTextColor(0, 0, 0); // Reset to black
+            doc.setFont(undefined, "normal");
+            yPosition += 25;
+          } else {
+            // Prepare table data
+            const tableData = section.items.map((item) => [
+              item.sku,
+              item.partNum,
+              item.mfr,
+              item.desc,
+              item.changeType,
+              item.oldQty === null ? "-" : item.oldQty.toString(),
+              item.newQty.toString(),
+              item.delta === null
+                ? "-"
+                : (item.delta > 0 ? "+" : "") + item.delta.toString(),
+            ]);
 
-          doc.autoTable({
-            startY: yPosition,
-            head: [
-              [
-                config.sectionViewColumns.sku,
-                config.sectionViewColumns.partNum,
-                config.sectionViewColumns.mfr,
-                config.sectionViewColumns.desc,
-                config.sectionViewColumns.changeType,
-                config.sectionViewColumns.oldQty,
-                config.sectionViewColumns.newQty,
-                config.sectionViewColumns.delta,
+            doc.autoTable({
+              startY: yPosition,
+              head: [
+                [
+                  config.sectionViewColumns.sku,
+                  config.sectionViewColumns.partNum,
+                  config.sectionViewColumns.mfr,
+                  config.sectionViewColumns.desc,
+                  config.sectionViewColumns.changeType,
+                  config.sectionViewColumns.oldQty,
+                  config.sectionViewColumns.newQty,
+                  config.sectionViewColumns.delta,
+                ],
               ],
-            ],
-            body: tableData,
-            theme: "grid",
-            headStyles: {
-              fillColor: [102, 126, 234],
-              textColor: 255,
-              fontStyle: "bold",
-              fontSize: 8,
-            },
-            bodyStyles: {
-              fontSize: 7,
-            },
-            columnStyles: {
-              0: { cellWidth: 20 },
-              1: { cellWidth: 35 },
-              2: { cellWidth: 25 },
-              3: { cellWidth: 55 },
-              4: { cellWidth: 18 },
-              5: { cellWidth: 12 },
-              6: { cellWidth: 12 },
-              7: { cellWidth: 12 },
-            },
-            didParseCell: function (data) {
-              if (data.row.section === "body") {
-                const item = section.items[data.row.index];
-                if (item.changeType === "Added") {
-                  data.cell.styles.fillColor = [212, 237, 218];
-                } else if (item.changeType === "Removed") {
-                  data.cell.styles.fillColor = [248, 215, 218];
-                } else if (item.changeType === "Quantity") {
-                  data.cell.styles.fillColor = [255, 243, 205];
+              body: tableData,
+              theme: "grid",
+              headStyles: {
+                fillColor: [102, 126, 234],
+                textColor: 255,
+                fontStyle: "bold",
+                fontSize: 8,
+              },
+              bodyStyles: {
+                fontSize: 7,
+              },
+              columnStyles: {
+                0: { cellWidth: 20 },
+                1: { cellWidth: 35 },
+                2: { cellWidth: 25 },
+                3: { cellWidth: 55 },
+                4: { cellWidth: 18 },
+                5: { cellWidth: 12 },
+                6: { cellWidth: 12 },
+                7: { cellWidth: 12 },
+              },
+              didParseCell: function (data) {
+                if (data.row.section === "body") {
+                  const item = section.items[data.row.index];
+                  if (item.changeType === "Added") {
+                    data.cell.styles.fillColor = [212, 237, 218];
+                  } else if (item.changeType === "Removed") {
+                    data.cell.styles.fillColor = [248, 215, 218];
+                  } else if (item.changeType === "Quantity") {
+                    data.cell.styles.fillColor = [255, 243, 205];
+                  }
                 }
-              }
-            },
-            margin: { left: 10, right: 10 },
-          });
+              },
+              margin: { left: 10, right: 10 },
+            });
 
-          yPosition = doc.lastAutoTable.finalY + 15;
+            yPosition = doc.lastAutoTable.finalY + 15;
+          }
         });
 
         // Aggregate Comparison
